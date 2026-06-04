@@ -1,0 +1,148 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>WLC Settings</h1>
+      <p class="subtitle">Manage how the backend connects to the Cisco C9800.</p>
+    </div>
+    <button class="btn-refresh" (click)="load()" [disabled]="loading()" title="Reload">↻</button>
+  </div>
+
+  <!-- ── First-run setup banner ───────────────────────── -->
+  <div class="banner setup" *ngIf="showSetupBanner()">
+    <strong>Welcome — let's wire the WLC.</strong>
+    No connection has been saved yet. Fill in the host, port, and credentials below,
+    use <em>Test connection</em> to validate, then <em>Save &amp; apply</em>.
+    You can stay in demo mode for now by leaving the toggle on.
+  </div>
+
+  <!-- ── Data source mode ─────────────────────────────── -->
+  <section class="card mode-card" *ngIf="demo() as d">
+    <div class="mode-head">
+      <div>
+        <h2>Data source</h2>
+        <p class="card-sub">
+          The backend serves either <strong>simulated</strong> data (demo) or
+          <strong>live</strong> data from your WLC. Toggling here swaps the active
+          client immediately, no restart needed.
+        </p>
+      </div>
+      <div class="mode-toggle">
+        <label class="switch" [class.disabled]="demoSaving()">
+          <input type="checkbox"
+                 [checked]="d.demo_mode"
+                 [disabled]="demoSaving()"
+                 (change)="toggleDemoMode(!d.demo_mode)" />
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+        <span class="mode-label" [class.on]="d.demo_mode">
+          {{ d.demo_mode ? 'Demo (simulated)' : 'Live (RESTCONF)' }}
+        </span>
+      </div>
+    </div>
+
+    <div class="mode-meta">
+      <span class="meta-item">
+        Env default:
+        <strong class="dim">{{ d.env_default ? 'demo' : 'live' }}</strong>
+      </span>
+      <span class="meta-item" *ngIf="d.override !== null">
+        Runtime override active:
+        <strong [class.green]="!d.demo_mode" [class.amber]="d.demo_mode">{{ d.demo_mode ? 'demo' : 'live' }}</strong>
+        <button type="button" class="btn-link"
+                (click)="resetDemoOverride()"
+                [disabled]="demoSaving()">Reset to env default</button>
+      </span>
+      <span class="meta-item" *ngIf="d.override === null">
+        <strong class="dim">Following env default</strong> (no override saved)
+      </span>
+    </div>
+
+    <div class="msg error" *ngIf="demoError()">{{ demoError() }}</div>
+  </section>
+
+  <div class="error-banner" *ngIf="loadError()">{{ loadError() }}</div>
+
+  <div class="layout" *ngIf="current() as c">
+    <!-- ── Current state ─────────────────────────────── -->
+    <section class="card current-card">
+      <h2>Current configuration</h2>
+      <dl class="kv">
+        <dt>Host</dt>             <dd class="mono">{{ c.host }}</dd>
+        <dt>Port</dt>             <dd class="mono">{{ c.port }}</dd>
+        <dt>Username</dt>         <dd class="mono">{{ c.username || '—' }}</dd>
+        <dt>Password</dt>         <dd>{{ c.password_set ? '••••••••' : '—' }}</dd>
+        <dt>Verify SSL</dt>       <dd>{{ c.verify_ssl ? 'yes' : 'no' }}</dd>
+        <dt>Source</dt>
+        <dd>
+          <span class="source-pill" [class.mongo]="c.source === 'mongo'">
+            {{ c.source === 'mongo' ? 'MongoDB (runtime)' : 'config / env' }}
+          </span>
+        </dd>
+        <ng-container *ngIf="c.updated_at">
+          <dt>Updated</dt>
+          <dd class="dim">{{ c.updated_at }} <span *ngIf="c.updated_by">by <strong>{{ c.updated_by }}</strong></span></dd>
+        </ng-container>
+      </dl>
+    </section>
+
+    <!-- ── Edit form ─────────────────────────────────── -->
+    <section class="card edit-card">
+      <h2>Update configuration</h2>
+      <p class="card-sub">Test the connection before saving to avoid breaking the live API.</p>
+
+      <form class="form" (ngSubmit)="save()">
+        <div class="grid">
+          <label class="field span-2">
+            <span class="field-label">Host / IP</span>
+            <input type="text" [(ngModel)]="host" name="host" placeholder="172.16.40.100" />
+          </label>
+          <label class="field">
+            <span class="field-label">RESTCONF Port</span>
+            <input type="number" [(ngModel)]="port" name="port" min="1" max="65535" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Username</span>
+            <input type="text" [(ngModel)]="username" name="username" autocomplete="off" />
+          </label>
+          <label class="field span-2">
+            <span class="field-label">Password <em>(leave empty to keep current)</em></span>
+            <input type="password" [(ngModel)]="password" name="password"
+                   autocomplete="new-password" placeholder="••••••••" />
+          </label>
+
+          <label class="checkbox span-3">
+            <input type="checkbox" [(ngModel)]="verifySsl" name="verifySsl" />
+            <span>Verify SSL certificate</span>
+          </label>
+        </div>
+
+        <!-- Test result banner -->
+        <div class="test-result" *ngIf="testResult() as r"
+             [class.ok]="r.ok" [class.ko]="!r.ok">
+          <strong *ngIf="r.ok">✓ Connected</strong>
+          <strong *ngIf="!r.ok">✗ Connection failed</strong>
+          to {{ r.tested_host }}:{{ r.tested_port }}
+          <span *ngIf="r.code"> · HTTP {{ r.code }}</span>
+          <span *ngIf="r.status && !r.ok"> · {{ r.status }}</span>
+          <span *ngIf="r.error" class="err-detail"> — {{ r.error }}</span>
+        </div>
+
+        <div class="msg error"   *ngIf="saveError()">{{ saveError() }}</div>
+        <div class="msg success" *ngIf="saveSuccess()">{{ saveSuccess() }}</div>
+
+        <div class="actions">
+          <button type="button" class="btn-secondary"
+                  (click)="testConnection()"
+                  [disabled]="testing() || saving() || !host.trim()">
+            {{ testing() ? 'Testing…' : 'Test connection' }}
+          </button>
+          <button type="submit" class="btn-primary"
+                  [disabled]="saving() || !dirty()">
+            {{ saving() ? 'Saving…' : 'Save & apply' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>

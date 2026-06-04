@@ -1,0 +1,23 @@
+# Dependencies
+*/node_modules
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Env / secrets
+.env
+.env.local
+backend/.env
+
+# Angular build / cache
+frontend/.angular/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp

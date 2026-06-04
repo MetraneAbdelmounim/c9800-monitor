@@ -1,0 +1,94 @@
+﻿<div class="page">
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <span class="status-badge" *ngIf="data">
+      <span class="dot" [style.background]="data.health.status === 'connected' || data.health.status === 'demo' ? '#34C759' : '#C8102E'"></span>
+      {{ data.health.status | uppercase }}
+    </span>
+  </div>
+
+  <div class="error" *ngIf="error">{{ error }}</div>
+
+  <app-spinner *ngIf="!data && !error" label="Loading dashboard…"></app-spinner>
+
+  <div *ngIf="data" class="content">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">HOSTNAME</div>
+        <div class="kpi-value red">{{ data.system.hostname }}</div>
+        <div class="kpi-sub">IOS-XE {{ data.system.version }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">ACCESS POINTS</div>
+        <div class="kpi-value green">{{ data.aps.total_aps }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">WIRELESS CLIENTS</div>
+        <div class="kpi-value blue">{{ data.clients.total_clients }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">SSIDs ACTIVE</div>
+        <div class="kpi-value purple">{{ data.wlans.total_wlans }}</div>
+      </div>
+    </div>
+
+    <div class="gauge-row">
+      <div class="card">
+        <div class="card-title">CPU Utilization</div>
+        <div class="gauges">
+          <div class="gauge-item" *ngFor="let g of [
+            {val: data.cpu.five_seconds, label: '5 sec'},
+            {val: data.cpu.one_minute, label: '1 min'},
+            {val: data.cpu.five_minutes, label: '5 min'}
+          ]">
+            <svg viewBox="0 0 100 90" class="gauge-svg">
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#2A2A2A" stroke-width="7"
+                stroke-dasharray="179 239" stroke-linecap="round" transform="rotate(135 50 50)"/>
+              <circle cx="50" cy="50" r="38" fill="none" [attr.stroke]="gaugeColor(g.val)" stroke-width="7"
+                [attr.stroke-dasharray]="(179 * g.val / 100) + ' 239'" stroke-linecap="round" transform="rotate(135 50 50)"/>
+              <text x="50" y="52" text-anchor="middle" fill="#F0EDED" font-size="18" font-weight="700"
+                font-family="JetBrains Mono, monospace">{{ g.val }}%</text>
+            </svg>
+            <div class="gauge-label">{{ g.label }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Memory</div>
+        <div class="mem-bars">
+          <div *ngFor="let pool of data.memory.pools" class="mem-item">
+            <div class="mem-header">
+              <span>{{ pool.name }}</span>
+              <span class="mono">{{ pool.used_percent }}%</span>
+            </div>
+            <div class="mem-bar-bg">
+              <div class="mem-bar-fill" [style.width.%]="pool.used_percent"
+                   [style.background]="gaugeColor(pool.used_percent)"></div>
+            </div>
+            <div class="mem-detail">{{ pool.used_mb }} / {{ pool.total_mb }} MB</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Client Distribution</div>
+        <div class="band-bars">
+          <div class="band-item">
+            <div class="band-header"><span>5 GHz</span><span class="mono">{{ data.clients.clients_5ghz }}</span></div>
+            <div class="band-bar-bg"><div class="band-bar-fill" style="background: #C8102E"
+              [style.width.%]="data.clients.total_clients ? (data.clients.clients_5ghz / data.clients.total_clients * 100) : 0"></div></div>
+          </div>
+          <div class="band-item">
+            <div class="band-header"><span>2.4 GHz</span><span class="mono">{{ data.clients.clients_2ghz }}</span></div>
+            <div class="band-bar-bg"><div class="band-bar-fill" style="background: #E8A838"
+              [style.width.%]="data.clients.total_clients ? (data.clients.clients_2ghz / data.clients.total_clients * 100) : 0"></div></div>
+          </div>
+          <div class="band-item">
+            <div class="band-header"><span>6 GHz</span><span class="mono">{{ data.clients.clients_6ghz }}</span></div>
+            <div class="band-bar-bg"><div class="band-bar-fill" style="background: #9B72CF"
+              [style.width.%]="data.clients.total_clients ? (data.clients.clients_6ghz / data.clients.total_clients * 100) : 0"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

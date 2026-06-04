@@ -1,0 +1,111 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Administration</h1>
+      <p class="subtitle">Manage users and your account</p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- ── My password ─────────────────────────────── -->
+    <section class="card">
+      <h2>Change my password</h2>
+      <p class="card-sub" *ngIf="currentUser() as u">Signed in as <strong>{{ u.username }}</strong> ({{ u.role }})</p>
+
+      <form class="form" (ngSubmit)="changeMyPassword()">
+        <label class="field">
+          <span class="field-label">New password</span>
+          <input type="password" [(ngModel)]="newOwnPassword" name="newOwnPassword"
+                 autocomplete="new-password" [disabled]="pwSaving()" />
+        </label>
+        <label class="field">
+          <span class="field-label">Confirm new password</span>
+          <input type="password" [(ngModel)]="confirmOwnPassword" name="confirmOwnPassword"
+                 autocomplete="new-password" [disabled]="pwSaving()" />
+        </label>
+
+        <div class="msg error"   *ngIf="pwError()">{{ pwError() }}</div>
+        <div class="msg success" *ngIf="pwSuccess()">{{ pwSuccess() }}</div>
+
+        <button type="submit" class="btn-primary" [disabled]="pwSaving()">
+          {{ pwSaving() ? 'Saving…' : 'Update password' }}
+        </button>
+      </form>
+    </section>
+
+    <!-- ── Create user ─────────────────────────────── -->
+    <section class="card">
+      <h2>Create a user</h2>
+      <p class="card-sub">Add an admin or viewer account.</p>
+
+      <form class="form" (ngSubmit)="createUser()">
+        <label class="field">
+          <span class="field-label">Username</span>
+          <input type="text" [(ngModel)]="newUsername" name="newUsername"
+                 autocomplete="off" [disabled]="creating()" />
+        </label>
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input type="password" [(ngModel)]="newPassword" name="newPassword"
+                 autocomplete="new-password" [disabled]="creating()" />
+        </label>
+        <label class="field">
+          <span class="field-label">Role</span>
+          <select [(ngModel)]="newRole" name="newRole" [disabled]="creating()">
+            <option value="viewer">viewer</option>
+            <option value="admin">admin</option>
+          </select>
+        </label>
+
+        <div class="msg error"   *ngIf="createError()">{{ createError() }}</div>
+        <div class="msg success" *ngIf="createSuccess()">{{ createSuccess() }}</div>
+
+        <button type="submit" class="btn-primary" [disabled]="creating()">
+          {{ creating() ? 'Creating…' : 'Create user' }}
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <!-- ── Users list ─────────────────────────────────── -->
+  <section class="card table-card">
+    <div class="card-head">
+      <h2>Users</h2>
+      <button class="btn-refresh" (click)="loadUsers()" [disabled]="loading()" title="Refresh">↻</button>
+    </div>
+
+    <div class="msg error" *ngIf="listError()">{{ listError() }}</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Created</th>
+          <th class="actions-col"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of users()">
+          <td class="name">
+            {{ u.username }}
+            <span class="self-tag" *ngIf="isSelf(u)">you</span>
+          </td>
+          <td><span class="role-pill" [class.admin]="u.role === 'admin'">{{ u.role }}</span></td>
+          <td class="dim">{{ u.created_at || '—' }}</td>
+          <td class="actions-col">
+            <button class="btn-delete"
+                    (click)="deleteUser(u)"
+                    [disabled]="isSelf(u)"
+                    [title]="isSelf(u) ? 'You cannot delete your own account' : 'Delete user'">
+              Delete
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="!loading() && users().length === 0">
+          <td colspan="4" class="empty">No users.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</div>

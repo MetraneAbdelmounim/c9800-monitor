@@ -1,0 +1,186 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>AP Map</h1>
+      <p class="subtitle">Access points on building floor plans &mdash; live status, coverage &amp; roaming</p>
+    </div>
+
+    <div class="header-actions" *ngIf="floors.length">
+      <select class="floor-select" [ngModel]="currentFloorId" (ngModelChange)="selectFloor($event)">
+        <optgroup *ngFor="let b of buildings" [label]="b.name">
+          <option *ngFor="let f of b.floors" [value]="f.id">{{ f.name }}</option>
+        </optgroup>
+      </select>
+
+      <ng-container *ngIf="isAdmin">
+        <button class="btn" [class.active]="editMode" (click)="toggleEdit()" *ngIf="currentFloorId">
+          {{ editMode ? 'Done' : 'Edit Layout' }}
+        </button>
+        <button class="btn" (click)="showFloorForm = true">+ Floor</button>
+        <button class="btn danger" (click)="deleteFloor()" *ngIf="currentFloorId && editMode">Delete</button>
+      </ng-container>
+    </div>
+  </div>
+
+  <div class="error-banner" *ngIf="error">{{ error }}</div>
+
+  <app-spinner *ngIf="loading" label="Loading map…"></app-spinner>
+
+  <!-- Empty state -->
+  <div class="empty-state" *ngIf="!loading && !floors.length">
+    <div class="empty-icon">🗺</div>
+    <div class="empty-title">No floor plans yet</div>
+    <p *ngIf="isAdmin">Upload a floor plan image, then drop your access points onto it.</p>
+    <p *ngIf="!isAdmin">An administrator hasn't set up any floor plans yet.</p>
+    <button class="btn primary" *ngIf="isAdmin" (click)="showFloorForm = true">+ Add a floor plan</button>
+  </div>
+
+  <!-- Layer toolbar (view mode) -->
+  <div class="layer-bar" *ngIf="!loading && currentFloorId && !editMode">
+    <div class="layer-toggles">
+      <button class="chip" [class.on]="showHeatmap" (click)="toggleHeatmap()">◍ Signal heatmap</button>
+      <button class="chip" [class.on]="showRoaming" (click)="toggleRoaming()">↯ Roaming paths</button>
+      <button class="chip" [class.on]="showCoverage" (click)="toggleCoverage()">◎ Coverage / channels</button>
+    </div>
+    <div class="locator">
+      <input type="text" [(ngModel)]="locateQuery" (keyup.enter)="locate()"
+             placeholder="Locate client (MAC / IP / host)…" />
+      <button class="btn" (click)="locate()">Locate</button>
+      <button class="btn" *ngIf="locatedApName || locateMsg" (click)="clearLocate()">Clear</button>
+    </div>
+  </div>
+  <div class="locate-msg" *ngIf="locateMsg">{{ locateMsg }}</div>
+
+  <!-- Save bar (edit mode) -->
+  <div class="save-bar" *ngIf="editMode && currentFloorId">
+    <span class="dirty-dot" [class.on]="dirty"></span>
+    <span class="save-text">{{ dirty ? 'Unsaved changes' : 'All changes saved' }}</span>
+    <span class="spacer"></span>
+    <button class="btn" (click)="discard()" [disabled]="!dirty || saving">Discard</button>
+    <button class="btn primary" (click)="save()" [disabled]="!dirty || saving">{{ saving ? 'Saving…' : 'Save layout' }}</button>
+  </div>
+
+  <!-- Main: optional edit sidebar + map -->
+  <div class="map-layout" *ngIf="!loading && currentFloorId">
+    <aside class="edit-sidebar" *ngIf="editMode">
+      <div class="es-title">PLACE APs <span>{{ unplacedAps.length }} left</span></div>
+      <div class="es-hint">Click an AP, then click its spot on the plan. Drag a placed marker to move it.</div>
+      <div class="es-list">
+        <button *ngFor="let ap of unplacedAps" class="es-ap" [class.armed]="armedMac === ap.wtp_mac"
+                (click)="armAp(ap)">
+          <span class="es-dot" [style.background]="markerColor(stateClass(ap))"></span>
+          <span class="es-name">{{ ap.name }}</span>
+          <span class="es-model">{{ ap.model }}</span>
+        </button>
+        <div *ngIf="!unplacedAps.length" class="es-empty">All APs placed ✓</div>
+      </div>
+    </aside>
+
+    <div class="map-wrap">
+      <div class="placing-hint" *ngIf="editMode && armedMac">Click on the plan to place this AP…</div>
+      <div class="map-area" #mapArea
+           [class.placing]="editMode && armedMac"
+           [class.editing]="editMode"
+           (click)="onMapClick($event)"
+           (mousemove)="onMapMouseMove($event)"
+           (mouseup)="onMapMouseUp()"
+           (mouseleave)="onMapMouseUp()">
+        <img *ngIf="currentFloor?.image" [src]="currentFloor!.image" alt="floor plan"
+             draggable="false" (load)="onImgLoad()" />
+
+        <!-- Heatmap layer -->
+        <canvas #heatCanvas class="heat-layer" [class.show]="showHeatmap && !editMode"></canvas>
+
+        <!-- Coverage circles -->
+        <div *ngFor="let c of coverageCircles" class="coverage" [class.warn]="c.warn"
+             [style.left.%]="c.x" [style.top.%]="c.y"
+             [style.background]="'radial-gradient(circle, ' + c.color + '40 0%, transparent 70%)'"
+             [style.borderColor]="c.color">
+          <span class="cov-ch">{{ c.channel }}</span>
+        </div>
+
+        <!-- Roaming paths -->
+        <svg *ngIf="showRoaming" class="roam-layer" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <line *ngFor="let l of roamLines" [attr.x1]="l.x1" [attr.y1]="l.y1" [attr.x2]="l.x2" [attr.y2]="l.y2"
+                [attr.stroke]="l.color" [attr.stroke-width]="l.w" stroke-linecap="round"
+                vector-effect="non-scaling-stroke" opacity="0.75" />
+        </svg>
+
+        <!-- AP markers -->
+        <div *ngFor="let m of markers" class="marker" [class]="m.cls" [class.located]="m.located"
+             [style.left.%]="m.p.x" [style.top.%]="m.p.y"
+             (mousedown)="onMarkerMouseDown(m.p.ap_mac, $event)"
+             (click)="onMarkerClick(m, $event)">
+          <span class="dot" [style.background]="markerColor(m.cls)"></span>
+          <span class="m-badge" *ngIf="m.clients">{{ m.clients }}</span>
+          <span class="m-label">{{ m.ap?.name || m.p.ap_name || '?' }}</span>
+          <button *ngIf="editMode" class="m-remove" title="Remove"
+                  (mousedown)="$event.stopPropagation()"
+                  (click)="removePlacement(m.p.ap_mac); $event.stopPropagation()">×</button>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="legend">
+        <span><i style="background:#34C759"></i> Up</span>
+        <span><i style="background:#E8A838"></i> Other</span>
+        <span><i style="background:#C8102E"></i> Down</span>
+        <span><i style="background:#706868"></i> Not reporting</span>
+        <span class="legend-note">badge = clients on AP</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- View-mode detail popup -->
+  <div class="ap-popup" *ngIf="selected as s" (click)="selected = null">
+    <div class="ap-popup-card" (click)="$event.stopPropagation()">
+      <div class="ap-popup-head">
+        <span class="ap-popup-dot" [style.background]="markerColor(s.cls)"></span>
+        <span class="ap-popup-name">{{ s.ap?.name || s.p.ap_name || 'Unknown AP' }}</span>
+        <button class="ap-popup-close" (click)="selected = null">×</button>
+      </div>
+      <div class="ap-popup-body" *ngIf="s.ap as ap">
+        <div class="row"><span>State</span><b [style.color]="markerColor(s.cls)">{{ ap.state || '—' }}</b></div>
+        <div class="row"><span>Clients</span><b>{{ s.clients }}</b></div>
+        <div class="row" *ngIf="s.channel"><span>Channel</span><b>{{ s.channel }}</b></div>
+        <div class="row"><span>Model</span><b>{{ ap.model || '—' }}</b></div>
+        <div class="row"><span>IP</span><b class="mono">{{ ap.ip || '—' }}</b></div>
+        <div class="row"><span>MAC</span><b class="mono">{{ ap.mac || ap.wtp_mac }}</b></div>
+        <div class="row"><span>Mode</span><b>{{ ap.mode || '—' }}</b></div>
+        <div class="row"><span>Uptime</span><b>{{ formatUptime(ap.uptime_sec) }}</b></div>
+        <div class="row"><span>Location</span><b>{{ ap.location || '—' }}</b></div>
+      </div>
+      <div class="ap-popup-body" *ngIf="!s.ap">
+        <p class="dim">This AP isn't currently reporting to the controller.</p>
+        <div class="row"><span>MAC</span><b class="mono">{{ s.p.ap_mac }}</b></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add floor form -->
+  <div class="modal" *ngIf="showFloorForm" (click)="showFloorForm = false">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-title">Add Floor Plan</div>
+      <label class="field">
+        <span>Floor name</span>
+        <input type="text" [(ngModel)]="newFloor.name" placeholder="e.g. Floor 1" />
+      </label>
+      <label class="field">
+        <span>Building</span>
+        <input type="text" [(ngModel)]="newFloor.building" placeholder="e.g. Main Building" />
+      </label>
+      <label class="field">
+        <span>Floor plan image</span>
+        <input type="file" accept="image/*" (change)="onFileSelected($event)" />
+      </label>
+      <div class="img-preview" *ngIf="pendingImage"><img [src]="pendingImage" alt="preview" /></div>
+      <div class="modal-actions">
+        <button class="btn" (click)="showFloorForm = false">Cancel</button>
+        <button class="btn primary" (click)="createFloor()"
+                [disabled]="!newFloor.name.trim() || !pendingImage || saving">
+          {{ saving ? 'Uploading…' : 'Create' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

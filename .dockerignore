@@ -1,0 +1,12 @@
+# Keep the build context small & reproducible
+**/node_modules
+frontend/dist
+frontend/.angular
+backend/__pycache__
+**/*.pyc
+.venv
+venv
+.git
+.gitignore
+deploy/nginx/certs
+*.md

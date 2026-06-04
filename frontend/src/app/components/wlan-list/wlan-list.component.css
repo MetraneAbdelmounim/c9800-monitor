@@ -1,0 +1,123 @@
+﻿.page { max-width: 1300px; }
+
+.page-header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 20px; gap: 16px;
+}
+h1 { font-size: 22px; font-weight: 800; color: var(--text-1); margin-bottom: 4px; }
+.subtitle { font-size: 12px; color: var(--text-3); }
+
+.btn-refresh {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text-2); font-size: 16px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-refresh:hover:not(:disabled) {
+  background: var(--brand-10);
+  border-color: var(--brand-20);
+  color: var(--brand-light);
+}
+.btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.error-banner {
+  background: rgba(62,107,176,0.10);
+  border: 1px solid rgba(62,107,176,0.25);
+  color: var(--brand-light);
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 12px; margin-bottom: 16px;
+}
+
+.toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+.search-box { position: relative; flex: 1; min-width: 240px; }
+.search-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--text-3); font-size: 14px;
+}
+.search-box input {
+  width: 100%; padding: 9px 14px 9px 32px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text-1);
+  font-family: inherit; font-size: 12px;
+  transition: border-color 0.15s;
+}
+.search-box input:focus { outline: none; border-color: var(--brand); }
+
+.toolbar select {
+  padding: 9px 12px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text-2);
+  font-family: inherit; font-size: 12px;
+  cursor: pointer; min-width: 130px;
+}
+.toolbar select:focus { outline: none; border-color: var(--brand); }
+
+.btn-clear {
+  padding: 9px 16px; background: transparent;
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text-3); font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-clear:hover { border-color: var(--brand-20); color: var(--brand-light); }
+
+.table-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 11px 14px; border-bottom: 1px solid var(--border); text-align: left; }
+th {
+  color: var(--text-muted); font-size: 10px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  background: var(--bg-card-alt);
+  user-select: none;
+}
+th.sortable { cursor: pointer; }
+th.sortable:hover { color: var(--brand-light); }
+.sort { color: var(--brand); margin-left: 4px; font-size: 9px; }
+
+td { color: var(--text-2); }
+tr.alt td { background: var(--bg-card-alt); }
+tr:hover td { background: var(--bg-hover); }
+
+.mono { font-family: var(--mono); font-size: 11px; }
+.bold { font-weight: 600; color: var(--text-1); }
+.ssid { color: var(--brand); font-weight: 600; }
+.dim { color: var(--text-3); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 10px; border-radius: 5px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.4px; text-transform: uppercase;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--text-3);
+}
+.status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.status-pill.up {
+  background: rgba(52,199,89,0.10);
+  border-color: rgba(52,199,89,0.25);
+  color: var(--green);
+}
+.status-pill.down {
+  background: rgba(80,72,72,0.18);
+  border-color: var(--border);
+  color: var(--text-3);
+}
+
+.sec-pill {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 10.5px; font-weight: 600;
+  background: rgba(155,114,207,0.10);
+  border: 1px solid rgba(155,114,207,0.25);
+  color: var(--purple);
+}
+
+.empty {
+  text-align: center; color: var(--text-3);
+  font-size: 12px; padding: 24px;
+}

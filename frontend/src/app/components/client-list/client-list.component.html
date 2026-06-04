@@ -1,0 +1,111 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Wireless Clients</h1>
+      <p class="subtitle">
+        <span *ngIf="!loading()">{{ filtered().length }} of {{ total() }} clients</span>
+        <span *ngIf="loading()">Loading…</span>
+      </p>
+    </div>
+    <button class="btn-refresh" (click)="load()" [disabled]="loading()" title="Refresh">↻</button>
+  </div>
+
+  <div class="error-banner" *ngIf="error()">{{ error() }}</div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <span class="search-icon">⌕</span>
+      <input
+        type="text"
+        placeholder="Search MAC, IP, hostname, username, AP, SSID, BSSID…"
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+      />
+    </div>
+
+    <select [ngModel]="filterBand()" (ngModelChange)="filterBand.set($event)">
+      <option value="">All bands</option>
+      <option *ngFor="let b of bandOptions()" [value]="b">{{ b }}</option>
+    </select>
+
+    <select [ngModel]="filterProtocol()" (ngModelChange)="filterProtocol.set($event)">
+      <option value="">All protocols</option>
+      <option *ngFor="let p of protocolOptions()" [value]="p">{{ p }}</option>
+    </select>
+
+    <select [ngModel]="filterSsid()" (ngModelChange)="filterSsid.set($event)">
+      <option value="">All SSIDs</option>
+      <option *ngFor="let s of ssidOptions()" [value]="s">{{ s }}</option>
+    </select>
+
+    <select [ngModel]="filterQuality()" (ngModelChange)="filterQuality.set($event)">
+      <option value="">All quality</option>
+      <option *ngFor="let q of qualityOptions" [value]="q">{{ q }}</option>
+    </select>
+
+    <button class="btn-clear" (click)="clearFilters()" title="Clear all filters">Clear</button>
+  </div>
+
+  <div class="table-card">
+    <app-spinner *ngIf="loading()" label="Loading clients…"></app-spinner>
+    <table *ngIf="!loading()">
+      <thead>
+        <tr>
+          <th class="sortable" (click)="setSort('hostname')">Client <span class="sort">{{ sortIndicator('hostname') }}</span></th>
+          <th class="sortable" (click)="setSort('ip')">IP / User <span class="sort">{{ sortIndicator('ip') }}</span></th>
+          <th class="sortable" (click)="setSort('ap_name')">AP / SSID <span class="sort">{{ sortIndicator('ap_name') }}</span></th>
+          <th class="sortable" (click)="setSort('band')">Band <span class="sort">{{ sortIndicator('band') }}</span></th>
+          <th class="sortable" (click)="setSort('protocol')">Protocol <span class="sort">{{ sortIndicator('protocol') }}</span></th>
+          <th class="sortable num" (click)="setSort('rssi_dbm')">RSSI <span class="sort">{{ sortIndicator('rssi_dbm') }}</span></th>
+          <th class="sortable num" (click)="setSort('snr_db')">SNR <span class="sort">{{ sortIndicator('snr_db') }}</span></th>
+          <th class="sortable num" (click)="setSort('data_rate_mbps')">Rate <span class="sort">{{ sortIndicator('data_rate_mbps') }}</span></th>
+          <th class="sortable" (click)="setSort('quality_score')">Quality <span class="sort">{{ sortIndicator('quality_score') }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let c of paged(); let i = index; trackBy: trackByMac" [class.alt]="i % 2 !== 0">
+          <td>
+            <div class="name">{{ c.hostname || c.mac }}</div>
+            <div class="sub mono">{{ c.mac }}</div>
+          </td>
+          <td>
+            <div class="mono">{{ c.ip || '—' }}</div>
+            <div class="sub">{{ c.username || '—' }}</div>
+          </td>
+          <td>
+            <div>{{ c.ap_name || '—' }}</div>
+            <div class="sub">{{ c.ssid || '—' }}</div>
+          </td>
+          <td><span class="band-pill" [class]="bandClass(c.band)">{{ c.band || '—' }}</span></td>
+          <td class="dim">{{ c.protocol || '—' }}</td>
+          <td class="mono bold num" [style.color]="rssiColor(c.rssi_dbm)">
+            {{ c.rssi_dbm || '—' }} <small>dBm</small>
+          </td>
+          <td class="mono bold num" [style.color]="snrColor(c.snr_db)">
+            {{ c.snr_db || '—' }} <small>dB</small>
+          </td>
+          <td class="mono num">{{ c.data_rate_mbps || '—' }} <small>Mbps</small></td>
+          <td>
+            <span class="qual-pill"
+                  [style.color]="qualColor(c.quality_score)"
+                  [style.background]="qualColor(c.quality_score) + '18'">
+              {{ c.quality_score }} — {{ c.quality_label }}
+            </span>
+          </td>
+        </tr>
+        <tr *ngIf="!loading() && filtered().length === 0">
+          <td colspan="9" class="empty">No clients match the current filters.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <app-paginator
+      *ngIf="!loading()"
+      [total]="filtered().length"
+      [pageSize]="pageSize()"
+      [page]="page()"
+      (pageChange)="page.set($event)"
+      (pageSizeChange)="pageSize.set($event)">
+    </app-paginator>
+  </div>
+</div>

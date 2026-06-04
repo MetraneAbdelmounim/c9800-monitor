@@ -1,0 +1,34 @@
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="asb-blocks">
+        <div class="asb-block navy">A</div>
+        <div class="asb-block red">S</div>
+        <div class="asb-block navy">B</div>
+        <div class="asb-block red">G</div>
+      </div>
+      <h1 class="login-title">WLC Monitor</h1>
+      <div class="login-sub">American School of Benguerir — sign in to continue</div>
+    </div>
+
+    <form class="login-form" (ngSubmit)="submit()">
+      <label class="field">
+        <span class="field-label">Username</span>
+        <input type="text" [(ngModel)]="username" name="username"
+               autocomplete="username" autofocus [disabled]="loading" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input type="password" [(ngModel)]="password" name="password"
+               autocomplete="current-password" [disabled]="loading" />
+      </label>
+
+      <div class="error" *ngIf="error">{{ error }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading">
+        {{ loading ? 'Signing in…' : 'Sign in' }}
+      </button>
+    </form>
+  </div>
+</div>

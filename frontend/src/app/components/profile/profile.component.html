@@ -1,0 +1,42 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>My Profile</h1>
+      <p class="subtitle" *ngIf="user() as u">
+        Signed in as <strong>{{ u.username }}</strong>
+        <span class="role-pill" [class.admin]="u.role === 'admin'">{{ u.role }}</span>
+      </p>
+    </div>
+  </div>
+
+  <div class="banner forced" *ngIf="forced()">
+    <strong>Password change required.</strong>
+    Your account is using a default or admin-issued password.
+    Please choose a new one before continuing.
+  </div>
+
+  <section class="card">
+    <h2>Change my password</h2>
+    <p class="card-sub">Minimum 8 characters. You'll stay signed in after the change.</p>
+
+    <form class="form" (ngSubmit)="submit()">
+      <label class="field">
+        <span class="field-label">New password</span>
+        <input type="password" [(ngModel)]="newPassword" name="newPassword"
+               autocomplete="new-password" [disabled]="saving()" autofocus />
+      </label>
+      <label class="field">
+        <span class="field-label">Confirm new password</span>
+        <input type="password" [(ngModel)]="confirmPassword" name="confirmPassword"
+               autocomplete="new-password" [disabled]="saving()" />
+      </label>
+
+      <div class="msg error"   *ngIf="error()">{{ error() }}</div>
+      <div class="msg success" *ngIf="success()">{{ success() }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Update password' }}
+      </button>
+    </form>
+  </section>
+</div>

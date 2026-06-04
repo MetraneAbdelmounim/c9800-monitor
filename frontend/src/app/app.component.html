@@ -1,0 +1,61 @@
+<div class="app-layout" [class.no-chrome]="hideChrome">
+  <nav class="sidebar" *ngIf="!hideChrome">
+    <div class="sidebar-header">
+      <div class="asb-blocks">
+        <div class="asb-block navy">A</div>
+        <div class="asb-block red">S</div>
+        <div class="asb-block navy">B</div>
+        <div class="asb-block red">G</div>
+      </div>
+      <div class="logo-text">WLC Monitor</div>
+      <div class="logo-sub">American School of Benguerir</div>
+    </div>
+    <div class="nav-items">
+      <div class="nav-section">MONITORING</div>
+      <a *ngFor="let item of navItems"
+         [routerLink]="item.path"
+         routerLinkActive="active"
+         class="nav-item">
+        <span class="nav-icon">{{ item.icon }}</span>
+        <span>{{ item.label }}</span>
+      </a>
+
+      <ng-container *ngIf="auth.hasRole('admin')">
+        <div class="nav-section">ADMIN</div>
+        <a *ngFor="let item of adminNavItems"
+           [routerLink]="item.path"
+           routerLinkActive="active"
+           class="nav-item">
+          <span class="nav-icon">{{ item.icon }}</span>
+          <span>{{ item.label }}</span>
+        </a>
+      </ng-container>
+    </div>
+
+    <div class="user-box" *ngIf="auth.user() as u">
+      <a class="user-info" routerLink="/profile" title="Edit profile">
+        <div class="user-name">
+          {{ u.username }}
+          <span class="pw-warn" *ngIf="u.must_change_password" title="Password change required">!</span>
+        </div>
+        <div class="user-role">{{ u.role }}</div>
+      </a>
+      <button class="logout-btn" (click)="logout()" title="Sign out" aria-label="Sign out">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="sidebar-footer">
+      <span class="status-dot" [class.up]="healthy" [class.down]="!healthy"></span>
+      <span class="footer-text">{{ healthy ? 'Connected' : 'Offline' }}</span>
+    </div>
+  </nav>
+  <main class="main-content">
+    <router-outlet></router-outlet>
+  </main>
+</div>

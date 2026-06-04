@@ -1,0 +1,119 @@
+﻿<div class="page">
+  <!-- SEARCH VIEW -->
+  <div *ngIf="view === 'search'">
+    <div class="page-header"><h1>Client Experience</h1><p class="subtitle">Search and analyze wireless client signal quality</p></div>
+
+    <div class="search-wrap">
+      <span class="search-icon">&#x2315;</span>
+      <input type="text" [(ngModel)]="query" (ngModelChange)="onSearch()" placeholder="Search by MAC, IP, username, hostname, AP, or SSID..." class="search-input" />
+      <button *ngIf="query" (click)="clearSearch()" class="clear-btn">&#x2715;</button>
+    </div>
+
+    <app-spinner *ngIf="loading" label="Loading clients…"></app-spinner>
+
+    <div class="stats-card" *ngIf="stats && !query">
+      <div class="card-title">NETWORK CLIENT HEALTH</div>
+      <div class="stats-grid">
+        <div class="stat-item"><div class="stat-label">TOTAL CLIENTS</div><div class="stat-value" style="color:#C8102E">{{ stats.total_clients }}</div></div>
+        <div class="stat-item"><div class="stat-label">AVG RSSI</div><div class="stat-value" [style.color]="rssiColor(stats.avg_rssi_dbm)">{{ stats.avg_rssi_dbm }}<small>dBm</small></div></div>
+        <div class="stat-item"><div class="stat-label">AVG SNR</div><div class="stat-value" [style.color]="snrColor(stats.avg_snr_db)">{{ stats.avg_snr_db }}<small>dB</small></div></div>
+        <div class="stat-item"><div class="stat-label">AVG QUALITY</div><div class="stat-value" [style.color]="qualColor(stats.avg_quality_score)">{{ stats.avg_quality_score }}<small>/100</small></div></div>
+      </div>
+      <div class="dist-bar"><div *ngFor="let k of qualKeys()" class="dist-seg" [style.width.%]="qualDistPct(k)" [style.background]="qualDistColor(k)"></div></div>
+      <div class="dist-legend"><div *ngFor="let k of qualKeys()" class="leg-item"><span class="leg-dot" [style.background]="qualDistColor(k)"></span><span class="leg-label">{{k}}</span><span class="leg-val">{{stats.quality_distribution[k]}}</span></div></div>
+    </div>
+
+    <div class="result-count" *ngIf="query">{{ results.length }} client{{ results.length !== 1 ? 's' : '' }} found</div>
+
+    <div class="table-header" *ngIf="!loading"><span>Client</span><span>IP / User</span><span>AP / SSID</span><span>Protocol</span><span>RSSI</span><span>SNR</span><span>Quality</span></div>
+    <div *ngFor="let c of results; let i = index" class="client-row" [class.alt]="i%2!==0" (click)="selectClient(c)">
+      <div><div class="name">{{c.hostname||c.mac}}</div><div class="sub mono">{{c.mac}}</div></div>
+      <div><div class="mono">{{c.ip}}</div><div class="sub">{{c.username||'&#8212;'}}</div></div>
+      <div><div class="semi">{{c.ap_name}}</div><div class="sub">{{c.ssid}} &#8226; {{c.band}}</div></div>
+      <div class="dim">{{c.protocol}}</div>
+      <div class="mono bold" [style.color]="rssiColor(c.rssi_dbm)">{{c.rssi_dbm}}<small>dBm</small></div>
+      <div class="mono bold" [style.color]="snrColor(c.snr_db)">{{c.snr_db}}<small>dB</small></div>
+      <div><span class="tag" [style.color]="qualColor(c.quality_score)" [style.background]="qualColor(c.quality_score)+'18'">{{c.quality_score}} &#8212; {{c.quality_label}}</span></div>
+    </div>
+  </div>
+
+  <!-- DETAIL VIEW -->
+  <div *ngIf="view==='detail' && selected">
+    <button class="back-btn" (click)="goBack()">&#8592; Back</button>
+
+    <div class="detail-top">
+      <div class="card identity-card">
+        <div class="id-row">
+          <span class="dev-icon">{{deviceIcon(selected.device_type)}}</span>
+          <div>
+            <div class="id-name">{{selected.hostname||selected.mac}}</div>
+            <div class="id-sub mono">{{selected.mac}} &#8226; {{selected.ip}}</div>
+            <div class="id-meta"><span *ngIf="selected.username" class="uname">{{selected.username}} &#8226; </span>{{selected.device_type}} &#8226; {{selected.os_type}}</div>
+          </div>
+        </div>
+      </div>
+      <div class="card score-card">
+        <div class="score-ring">
+          <svg viewBox="0 0 100 100" class="ring-svg">
+            <circle cx="50" cy="50" r="40" fill="none" stroke="#2A2A2A" stroke-width="8"/>
+            <circle cx="50" cy="50" r="40" fill="none" [attr.stroke]="qualColor(selected.quality_score)" stroke-width="8" [attr.stroke-dasharray]="gaugeDash()" [attr.stroke-dashoffset]="gaugeArc(selected.quality_score)" stroke-linecap="round" style="transform:rotate(-90deg);transform-origin:center;"/>
+          </svg>
+          <div class="ring-text"><span class="ring-val" [style.color]="qualColor(selected.quality_score)">{{selected.quality_score}}</span><span class="ring-lbl">SCORE</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">RF / SIGNAL QUALITY</div>
+      <div class="metrics-grid">
+        <div class="metric"><div class="m-label">RSSI</div><div class="m-val" [style.color]="rssiColor(selected.rssi_dbm)">{{selected.rssi_dbm}}<small>dBm</small></div></div>
+        <div class="metric"><div class="m-label">SNR</div><div class="m-val" [style.color]="snrColor(selected.snr_db)">{{selected.snr_db}}<small>dB</small></div></div>
+        <div class="metric"><div class="m-label">DATA RATE</div><div class="m-val" style="color:#C8102E">{{selected.data_rate_mbps}}<small>Mbps</small></div></div>
+        <div class="metric"><div class="m-label">TX POWER</div><div class="m-val" style="color:#9B72CF">{{selected.tx_power_dbm}}<small>dBm</small></div></div>
+        <div class="metric"><div class="m-label">MCS INDEX</div><div class="m-val">{{selected.mcs_index}}</div></div>
+        <div class="metric"><div class="m-label">STREAMS</div><div class="m-val">{{selected.spatial_streams}} SS</div></div>
+        <div class="metric"><div class="m-label">CH WIDTH</div><div class="m-val" style="color:#A8A0A0">{{selected.channel_width}}</div></div>
+        <div class="metric"><div class="m-label">RETRIES</div><div class="m-val" [style.color]="retriesColor(selected.data_retries)">{{selected.data_retries}}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">SIGNAL STRENGTH SCALE</div>
+      <div class="sig-scale">
+        <div class="scale-bar"></div>
+        <div class="scale-marker" [style.left.%]="rssiPosition(selected.rssi_dbm)">
+          <div class="mk-val mono" [style.color]="rssiColor(selected.rssi_dbm)">{{selected.rssi_dbm}}</div>
+          <div class="mk-line" [style.background]="rssiColor(selected.rssi_dbm)"></div>
+        </div>
+        <div class="scale-nums"><span>-90</span><span>-80</span><span>-70</span><span>-60</span><span>-50</span><span>-30</span></div>
+        <div class="scale-ends"><span>&#x25C4; WEAK</span><span>STRONG &#x25BA;</span></div>
+      </div>
+    </div>
+
+    <div class="detail-grid">
+      <div class="card">
+        <div class="card-title">CONNECTION</div>
+        <div class="info-row"><span class="i-label">Access Point</span><span class="i-val mono">{{selected.ap_name}}</span></div>
+        <div class="info-row"><span class="i-label">SSID</span><span class="i-val mono">{{selected.ssid}}</span></div>
+        <div class="info-row"><span class="i-label">Band / Channel</span><span class="i-val mono">{{selected.band}} / Ch {{selected.channel}}</span></div>
+        <div class="info-row"><span class="i-label">Protocol</span><span class="i-val mono">{{selected.protocol}}</span></div>
+        <div class="info-row"><span class="i-label">VLAN</span><span class="i-val mono">{{selected.vlan}}</span></div>
+        <div class="info-row"><span class="i-label">Auth State</span><span class="i-val mono">{{selected.state}}</span></div>
+        <div class="info-row"><span class="i-label">Roam Count</span><span class="i-val mono">{{selected.roam_count}}</span></div>
+        <div class="info-row"><span class="i-label">Session</span><span class="i-val mono">{{fmtDuration(selected.session_duration_sec)}}</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">TRAFFIC</div>
+        <div class="traffic-row">
+          <div class="metric"><div class="m-label">TX (UPLOAD)</div><div class="m-val" style="color:#C8102E">{{fmtBytes(selected.bytes_tx)}}</div></div>
+          <div class="metric"><div class="m-label">RX (DOWNLOAD)</div><div class="m-val" style="color:#34C759">{{fmtBytes(selected.bytes_rx)}}</div></div>
+        </div>
+        <div class="ratio-lbl">TX / RX RATIO</div>
+        <div class="ratio-bar"><div class="r-tx" [style.width.%]="selected.bytes_tx/(selected.bytes_tx+selected.bytes_rx)*100"></div><div class="r-rx"></div></div>
+        <div class="ratio-leg"><span>&#x2191; Upload</span><span>&#x2193; Download</span></div>
+        <div class="info-row"><span class="i-label">Data Retries</span><span class="i-val mono" [style.color]="retriesColor(selected.data_retries)">{{selected.data_retries}}</span></div>
+        <div class="info-row"><span class="i-label">Session</span><span class="i-val mono">{{fmtDuration(selected.session_duration_sec)}}</span></div>
+      </div>
+    </div>
+  </div>
+</div>

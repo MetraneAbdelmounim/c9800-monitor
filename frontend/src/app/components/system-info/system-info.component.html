@@ -1,0 +1,33 @@
+﻿<div class="page">
+  <h1>System Information</h1>
+  <app-spinner *ngIf="!system" label="Loading system info…"></app-spinner>
+  <div class="grid" *ngIf="system">
+    <div class="card">
+      <div class="card-title">SYSTEM</div>
+      <div class="info-row"><span class="label">Hostname</span><span class="value">{{ system.hostname }}</span></div>
+      <div class="info-row"><span class="label">IOS-XE Version</span><span class="value mono">{{ system.version }}</span></div>
+      <div class="info-row" *ngIf="health"><span class="label">Status</span><span class="value" [style.color]="health.status === 'connected' || health.status === 'demo' ? '#34C759' : '#C8102E'">{{ health.status | uppercase }}</span></div>
+    </div>
+    <div class="card" *ngIf="cpu">
+      <div class="card-title">CPU UTILIZATION</div>
+      <div class="info-row"><span class="label">5 Seconds</span><span class="value mono" [style.color]="gaugeColor(cpu.five_seconds)">{{ cpu.five_seconds }}%</span></div>
+      <div class="info-row"><span class="label">1 Minute</span><span class="value mono" [style.color]="gaugeColor(cpu.one_minute)">{{ cpu.one_minute }}%</span></div>
+      <div class="info-row"><span class="label">5 Minutes</span><span class="value mono" [style.color]="gaugeColor(cpu.five_minutes)">{{ cpu.five_minutes }}%</span></div>
+    </div>
+    <div class="card" *ngIf="memory">
+      <div class="card-title">MEMORY</div>
+      <div *ngFor="let p of memory.pools" class="mem-item">
+        <div class="info-row"><span class="label">{{ p.name }}</span><span class="value mono" [style.color]="gaugeColor(p.used_percent)">{{ p.used_percent }}%</span></div>
+        <div class="bar-bg"><div class="bar-fill" [style.width.%]="p.used_percent" [style.background]="gaugeColor(p.used_percent)"></div></div>
+        <div class="detail">{{ p.used_mb }} / {{ p.total_mb }} MB</div>
+      </div>
+    </div>
+    <div class="card" *ngIf="interfaces">
+      <div class="card-title">INTERFACES</div>
+      <div *ngFor="let iface of interfaces.interfaces" class="info-row">
+        <span class="label">{{ iface.name }}</span>
+        <span class="value" [style.color]="iface.oper_status === 'up' ? '#34C759' : '#C8102E'">{{ iface.oper_status }}</span>
+      </div>
+    </div>
+  </div>
+</div>

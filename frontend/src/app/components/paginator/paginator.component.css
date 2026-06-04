@@ -1,0 +1,60 @@
+﻿.paginator {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-card-alt);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  flex-wrap: wrap; gap: 12px;
+}
+
+.paginator-info {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.paginator-controls {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+
+.page-size {
+  padding: 6px 10px;
+  margin-right: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-family: inherit; font-size: 11px;
+  cursor: pointer;
+}
+.page-size:focus { outline: none; border-color: var(--brand); }
+
+.nav, .page-btn {
+  min-width: 30px; height: 30px;
+  padding: 0 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+  font-variant-numeric: tabular-nums;
+}
+.nav { font-size: 16px; line-height: 1; }
+.page-btn:disabled, .nav:disabled {
+  opacity: 0.35; cursor: not-allowed;
+}
+.page-btn:not(:disabled):hover, .nav:not(:disabled):hover {
+  background: var(--brand-10);
+  border-color: var(--brand-20);
+  color: var(--brand-light);
+}
+.page-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: white;
+}
+.page-btn.active:hover {
+  background: var(--brand-dark);
+  color: white;
+}

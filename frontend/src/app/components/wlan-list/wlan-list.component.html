@@ -1,0 +1,89 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>WLANs / SSIDs</h1>
+      <p class="subtitle">
+        <span *ngIf="!loading()">{{ filtered().length }} of {{ total() }} WLANs</span>
+        <span *ngIf="loading()">Loading…</span>
+      </p>
+    </div>
+    <button class="btn-refresh" (click)="load()" [disabled]="loading()" title="Refresh">↻</button>
+  </div>
+
+  <div class="error-banner" *ngIf="error()">{{ error() }}</div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <span class="search-icon">⌕</span>
+      <input
+        type="text"
+        placeholder="Search profile, SSID, ID, policy…"
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+      />
+    </div>
+
+    <select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)">
+      <option value="">All statuses</option>
+      <option *ngFor="let s of statusOptions()" [value]="s">{{ s }}</option>
+    </select>
+
+    <select [ngModel]="filterSecurity()" (ngModelChange)="filterSecurity.set($event)">
+      <option value="">All security</option>
+      <option *ngFor="let s of securityOptions()" [value]="s">{{ s }}</option>
+    </select>
+
+    <select [ngModel]="filterBand()" (ngModelChange)="filterBand.set($event)">
+      <option value="">All bands</option>
+      <option *ngFor="let b of bandOptions()" [value]="b">{{ b }}</option>
+    </select>
+
+    <button class="btn-clear" (click)="clearFilters()" title="Clear all filters">Clear</button>
+  </div>
+
+  <div class="table-card">
+    <app-spinner *ngIf="loading()" label="Loading WLANs…"></app-spinner>
+    <table *ngIf="!loading()">
+      <thead>
+        <tr>
+          <th class="sortable num" (click)="setSort('wlan_id')">ID <span class="sort">{{ sortIndicator('wlan_id') }}</span></th>
+          <th class="sortable" (click)="setSort('profile_name')">Profile <span class="sort">{{ sortIndicator('profile_name') }}</span></th>
+          <th class="sortable" (click)="setSort('ssid')">SSID <span class="sort">{{ sortIndicator('ssid') }}</span></th>
+          <th class="sortable" (click)="setSort('status')">Status <span class="sort">{{ sortIndicator('status') }}</span></th>
+          <th class="sortable" (click)="setSort('band_str')">Bands <span class="sort">{{ sortIndicator('band_str') }}</span></th>
+          <th class="sortable" (click)="setSort('security')">Security <span class="sort">{{ sortIndicator('security') }}</span></th>
+          <th class="sortable" (click)="setSort('policy_tag')">Policy Tag <span class="sort">{{ sortIndicator('policy_tag') }}</span></th>
+          <th>Policy Profile</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let w of paged(); let i = index; trackBy: trackById" [class.alt]="i % 2 !== 0">
+          <td class="mono num">{{ w.wlan_id }}</td>
+          <td class="bold">{{ w.profile_name }}</td>
+          <td class="ssid">{{ w.ssid || '—' }}</td>
+          <td>
+            <span class="status-pill" [class]="statusClass(w.status)">
+              <span class="dot"></span> {{ w.status }}
+            </span>
+          </td>
+          <td>{{ w.band_str || '—' }}</td>
+          <td><span class="sec-pill">{{ w.security || 'Open' }}</span></td>
+          <td class="dim">{{ w.policy_tag || '—' }}</td>
+          <td class="dim">{{ w.policy_profile || '—' }}</td>
+        </tr>
+        <tr *ngIf="!loading() && filtered().length === 0">
+          <td colspan="8" class="empty">No WLANs match the current filters.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <app-paginator
+      *ngIf="!loading()"
+      [total]="filtered().length"
+      [pageSize]="pageSize()"
+      [page]="page()"
+      (pageChange)="page.set($event)"
+      (pageSizeChange)="pageSize.set($event)">
+    </app-paginator>
+  </div>
+</div>

@@ -1,0 +1,49 @@
+/* American School of Benguerir — Design System — C9800 WLC Monitor */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── ASB brand ──────────────────────────────────────── */
+  /* Primary identity navy (deep) + accent red, from the school crest. */
+  --asb-navy: #1B3A6B;
+  --asb-red: #C8102E;
+
+  /* Brand accent used across UI chrome (nav, buttons, focus, links).
+     A medium navy that stays legible as text on the dark theme AND
+     reads well as a solid fill with white labels. */
+  --brand: #3E6BB0;
+  --brand-light: #6E97D6;
+  --brand-dark: #2C4F87;
+  --brand-10: rgba(62,107,176,0.14);
+  --brand-20: rgba(62,107,176,0.30);
+
+  --bg-page: #0F0F0F;
+  --bg-card: #1C1C1C;
+  --bg-card-alt: #171717;
+  --bg-hover: #242424;
+  --bg-active: #16213A;
+  --border: #2A2A2A;
+  --border-light: #333333;
+  --text-1: #F0EDED;
+  --text-2: #A8A0A0;
+  --text-3: #706868;
+  --text-muted: #504848;
+  --green: #34C759;
+  --blue: #5A9BD5;
+  --amber: #E8A838;
+  --orange: #E07830;
+  --red: #C8102E;
+  --purple: #9B72CF;
+  --font: 'Plus Jakarta Sans', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --radius: 10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-family: var(--font); font-size: 14px; -webkit-font-smoothing: antialiased; }
+body { background: var(--bg-page); color: var(--text-1); min-height: 100vh; }
+::selection { background: var(--brand-20); }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-page); }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand); }
+a { color: var(--brand-light); text-decoration: none; }

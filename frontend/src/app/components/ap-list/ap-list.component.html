@@ -1,0 +1,89 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Access Points</h1>
+      <p class="subtitle">
+        <span *ngIf="!loading()">{{ filtered().length }} of {{ totalRegistered() }} APs</span>
+        <span *ngIf="loading()">Loading…</span>
+      </p>
+    </div>
+    <button class="btn-refresh" (click)="load()" [disabled]="loading()" title="Refresh">↻</button>
+  </div>
+
+  <div class="error-banner" *ngIf="error()">{{ error() }}</div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <span class="search-icon">⌕</span>
+      <input
+        type="text"
+        placeholder="Search name, IP, MAC, location, model, serial…"
+        [ngModel]="search()"
+        (ngModelChange)="search.set($event)"
+      />
+    </div>
+
+    <select [ngModel]="filterState()" (ngModelChange)="filterState.set($event)">
+      <option value="">All states</option>
+      <option *ngFor="let s of stateOptions()" [value]="s">{{ s }}</option>
+    </select>
+
+    <select [ngModel]="filterMode()" (ngModelChange)="filterMode.set($event)">
+      <option value="">All modes</option>
+      <option *ngFor="let m of modeOptions()" [value]="m">{{ m }}</option>
+    </select>
+
+    <select [ngModel]="filterModel()" (ngModelChange)="filterModel.set($event)">
+      <option value="">All models</option>
+      <option *ngFor="let m of modelOptions()" [value]="m">{{ m }}</option>
+    </select>
+
+    <button class="btn-clear" (click)="clearFilters()" title="Clear all filters">Clear</button>
+  </div>
+
+  <div class="table-card">
+    <app-spinner *ngIf="loading()" label="Loading access points…"></app-spinner>
+    <table *ngIf="!loading()">
+      <thead>
+        <tr>
+          <th class="sortable" (click)="setSort('name')">Name <span class="sort">{{ sortIndicator('name') }}</span></th>
+          <th class="sortable" (click)="setSort('model')">Model <span class="sort">{{ sortIndicator('model') }}</span></th>
+          <th class="sortable" (click)="setSort('ip')">IP <span class="sort">{{ sortIndicator('ip') }}</span></th>
+          <th>MAC</th>
+          <th class="sortable" (click)="setSort('state')">State <span class="sort">{{ sortIndicator('state') }}</span></th>
+          <th class="sortable" (click)="setSort('mode')">Mode <span class="sort">{{ sortIndicator('mode') }}</span></th>
+          <th class="sortable" (click)="setSort('location')">Location <span class="sort">{{ sortIndicator('location') }}</span></th>
+          <th class="sortable" (click)="setSort('sw_version')">SW Version <span class="sort">{{ sortIndicator('sw_version') }}</span></th>
+          <th class="sortable num" (click)="setSort('uptime_sec')">Uptime <span class="sort">{{ sortIndicator('uptime_sec') }}</span></th>
+          <th class="sortable num" (click)="setSort('max_clients')">Max Cli <span class="sort">{{ sortIndicator('max_clients') }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let ap of paged(); let i = index; trackBy: trackByMac" [class.alt]="i % 2 !== 0">
+          <td class="name">{{ ap.name }}</td>
+          <td class="mono">{{ ap.model }}</td>
+          <td class="mono">{{ ap.ip }}</td>
+          <td class="mono dim">{{ ap.mac || ap.wtp_mac }}</td>
+          <td><span class="state-pill" [class]="stateClass(ap.state)">{{ ap.state || '—' }}</span></td>
+          <td>{{ ap.mode || '—' }}</td>
+          <td>{{ ap.location || '—' }}</td>
+          <td class="mono dim">{{ ap.sw_version || '—' }}</td>
+          <td class="num">{{ formatUptime(ap.uptime_sec) }}</td>
+          <td class="num">{{ ap.max_clients || '—' }}</td>
+        </tr>
+        <tr *ngIf="!loading() && filtered().length === 0">
+          <td colspan="10" class="empty">No access points match the current filters.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <app-paginator
+      *ngIf="!loading()"
+      [total]="filtered().length"
+      [pageSize]="pageSize()"
+      [page]="page()"
+      (pageChange)="page.set($event)"
+      (pageSizeChange)="pageSize.set($event)">
+    </app-paginator>
+  </div>
+</div>

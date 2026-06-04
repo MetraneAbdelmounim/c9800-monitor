@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ping -n 2 192.168.100.16)",
+      "Bash(curl -k -s -o NUL -w \"HTTP %{http_code} | connect=%{time_connect}s total=%{time_total}s\\\\n\" --max-time 15 -u admin:P@ss2025 -H \"Accept: application/yang-data+json\" https://192.168.100.16:443/restconf/data/Cisco-IOS-XE-native:native/hostname)",
+      "Bash(curl -k -s -o NUL -w \"root /restconf -> HTTP %{http_code} | total=%{time_total}s\\\\n\" --max-time 15 -u admin:P@ss2025 https://192.168.100.16:443/restconf)",
+      "Bash(python -c \"import requests; print\\('RetryError ok:', requests.exceptions.RetryError\\); import restconf_client; print\\('module import ok'\\)\")",
+      "Bash(python -m py_compile app.py)",
+      "Bash(python -m py_compile app.py map_routes.py)"
+    ]
+  }
+}
