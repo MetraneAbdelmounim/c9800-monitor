@@ -42,11 +42,11 @@
             {val: data.cpu.five_minutes, label: '5 min'}
           ]">
             <svg viewBox="0 0 100 90" class="gauge-svg">
-              <circle cx="50" cy="50" r="38" fill="none" stroke="#2A2A2A" stroke-width="7"
+              <circle class="gauge-track" cx="50" cy="50" r="38" fill="none" stroke-width="7"
                 stroke-dasharray="179 239" stroke-linecap="round" transform="rotate(135 50 50)"/>
               <circle cx="50" cy="50" r="38" fill="none" [attr.stroke]="gaugeColor(g.val)" stroke-width="7"
                 [attr.stroke-dasharray]="(179 * g.val / 100) + ' 239'" stroke-linecap="round" transform="rotate(135 50 50)"/>
-              <text x="50" y="52" text-anchor="middle" fill="#F0EDED" font-size="18" font-weight="700"
+              <text class="gauge-text" x="50" y="52" text-anchor="middle" font-size="18" font-weight="700"
                 font-family="JetBrains Mono, monospace">{{ g.val }}%</text>
             </svg>
             <div class="gauge-label">{{ g.label }}</div>

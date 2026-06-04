@@ -55,7 +55,7 @@
       <div class="card score-card">
         <div class="score-ring">
           <svg viewBox="0 0 100 100" class="ring-svg">
-            <circle cx="50" cy="50" r="40" fill="none" stroke="#2A2A2A" stroke-width="8"/>
+            <circle class="ring-track" cx="50" cy="50" r="40" fill="none" stroke-width="8"/>
             <circle cx="50" cy="50" r="40" fill="none" [attr.stroke]="qualColor(selected.quality_score)" stroke-width="8" [attr.stroke-dasharray]="gaugeDash()" [attr.stroke-dashoffset]="gaugeArc(selected.quality_score)" stroke-linecap="round" style="transform:rotate(-90deg);transform-origin:center;"/>
           </svg>
           <div class="ring-text"><span class="ring-val" [style.color]="qualColor(selected.quality_score)">{{selected.quality_score}}</span><span class="ring-lbl">SCORE</span></div>
@@ -72,7 +72,7 @@
         <div class="metric"><div class="m-label">TX POWER</div><div class="m-val" style="color:#9B72CF">{{selected.tx_power_dbm}}<small>dBm</small></div></div>
         <div class="metric"><div class="m-label">MCS INDEX</div><div class="m-val">{{selected.mcs_index}}</div></div>
         <div class="metric"><div class="m-label">STREAMS</div><div class="m-val">{{selected.spatial_streams}} SS</div></div>
-        <div class="metric"><div class="m-label">CH WIDTH</div><div class="m-val" style="color:#A8A0A0">{{selected.channel_width}}</div></div>
+        <div class="metric"><div class="m-label">CH WIDTH</div><div class="m-val" style="color:var(--text-2)">{{selected.channel_width}}</div></div>
         <div class="metric"><div class="m-label">RETRIES</div><div class="m-val" [style.color]="retriesColor(selected.data_retries)">{{selected.data_retries}}</div></div>
       </div>
     </div>

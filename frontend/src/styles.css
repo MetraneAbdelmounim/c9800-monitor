@@ -7,15 +7,14 @@
   --asb-navy: #1B3A6B;
   --asb-red: #C8102E;
 
-  /* Brand accent used across UI chrome (nav, buttons, focus, links).
-     A medium navy that stays legible as text on the dark theme AND
-     reads well as a solid fill with white labels. */
+  /* Brand accent used across UI chrome (nav, buttons, focus, links). */
   --brand: #3E6BB0;
   --brand-light: #6E97D6;
   --brand-dark: #2C4F87;
   --brand-10: rgba(62,107,176,0.14);
   --brand-20: rgba(62,107,176,0.30);
 
+  /* ── Dark theme (default) ───────────────────────────── */
   --bg-page: #0F0F0F;
   --bg-card: #1C1C1C;
   --bg-card-alt: #171717;
@@ -27,15 +26,41 @@
   --text-2: #A8A0A0;
   --text-3: #706868;
   --text-muted: #504848;
+  --scrollbar: #333333;
+
+  /* Semantic / data-viz colors (shared across themes) */
   --green: #34C759;
   --blue: #5A9BD5;
   --amber: #E8A838;
   --orange: #E07830;
   --red: #C8102E;
   --purple: #9B72CF;
+
   --font: 'Plus Jakarta Sans', sans-serif;
   --mono: 'JetBrains Mono', monospace;
   --radius: 10px;
+}
+
+/* ── Light theme ──────────────────────────────────────── */
+:root[data-theme="light"] {
+  --brand: #2F5B9E;
+  --brand-light: #2C4F87;     /* darker so accent text stays legible on white */
+  --brand-dark: #234777;
+  --brand-10: rgba(47,91,158,0.10);
+  --brand-20: rgba(47,91,158,0.28);
+
+  --bg-page: #F4F5F7;
+  --bg-card: #FFFFFF;
+  --bg-card-alt: #F7F8FA;
+  --bg-hover: #EEF1F5;
+  --bg-active: #E7EEF8;
+  --border: #E3E6EB;
+  --border-light: #D4D9E0;
+  --text-1: #1A1F2B;
+  --text-2: #45505F;
+  --text-3: #6B7280;
+  --text-muted: #9AA1AD;
+  --scrollbar: #C4CAD3;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -44,6 +69,6 @@ body { background: var(--bg-page); color: var(--text-1); min-height: 100vh; }
 ::selection { background: var(--brand-20); }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-page); }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--brand); }
 a { color: var(--brand-light); text-decoration: none; }

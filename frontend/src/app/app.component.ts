@@ -5,6 +5,7 @@ import { HttpClient } from '@angular/common/http';
 import { filter } from 'rxjs/operators';
 import { WlcService } from './services/wlc.service';
 import { AuthService } from './services/auth.service';
+import { ThemeService } from './services/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -19,6 +20,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private iv: any;
 
   readonly auth = inject(AuthService);
+  readonly theme = inject(ThemeService);
   private router = inject(Router);
 
   navItems = [

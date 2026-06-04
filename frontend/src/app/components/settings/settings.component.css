@@ -224,6 +224,11 @@ h1 { font-size: 22px; font-weight: 800; color: var(--text-1); margin-bottom: 4px
 .field select:disabled { opacity: 0.5; }
 .card-sub.hint { margin-top: 10px; font-size: 11px; color: var(--text-3); }
 
+/* Match the data-source card's spacing so it doesn't sit flush on the row below */
+.cleanup-card { margin-bottom: 16px; padding: 18px 22px; }
+.cleanup-card h2 { margin: 0 0 6px; }
+.cleanup-card .grid { margin-top: 4px; }
+
 .checkbox {
   display: flex; align-items: center; gap: 8px;
   font-size: 12px; color: var(--text-2);

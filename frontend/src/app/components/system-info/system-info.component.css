@@ -1,13 +1,13 @@
 .page { max-width: 1200px; }
-h1 { font-size: 22px; font-weight: 800; color: #F0EDED; margin-bottom: 20px; }
+h1 { font-size: 22px; font-weight: 800; color: var(--text-1); margin-bottom: 20px; }
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-.card { background: #1C1C1C; border: 1px solid #2A2A2A; border-radius: 10px; padding: 18px 20px; }
-.card-title { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: #504848; text-transform: uppercase; margin-bottom: 14px; }
-.info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #2A2A2A; }
-.label { font-size: 12px; color: #706868; }
-.value { font-size: 13px; font-weight: 600; color: #A8A0A0; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+.card-title { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 14px; }
+.info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.label { font-size: 12px; color: var(--text-3); }
+.value { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .mono { font-family: 'JetBrains Mono', monospace; }
 .mem-item { margin-bottom: 12px; }
-.bar-bg { height: 6px; background: #2A2A2A; border-radius: 3px; margin: 6px 0 4px; }
+.bar-bg { height: 6px; background: var(--border); border-radius: 3px; margin: 6px 0 4px; }
 .bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s; }
-.detail { font-size: 10px; color: #504848; font-family: 'JetBrains Mono', monospace; }
+.detail { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }

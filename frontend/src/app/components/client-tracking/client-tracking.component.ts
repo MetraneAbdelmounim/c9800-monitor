@@ -11,19 +11,19 @@ declare var Chart: any;
   imports: [CommonModule, FormsModule, SpinnerComponent],
   template: `
 <div style="max-width:1200px">
-  <h1 style="font-size:22px;font-weight:800;color:#F0EDED">Client Tracking</h1>
-  <p style="font-size:12px;color:#504848;margin:2px 0 20px">Historical signal quality, roaming events, and performance analysis</p>
+  <h1 style="font-size:22px;font-weight:800;color:var(--text-1)">Client Tracking</h1>
+  <p style="font-size:12px;color:var(--text-muted);margin:2px 0 20px">Historical signal quality, roaming events, and performance analysis</p>
 
   <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center">
     <div style="flex:1;position:relative">
       <input type="text" [(ngModel)]="query" (ngModelChange)="onSearch()" (focus)="showDD=true"
         placeholder="Search client by MAC, IP, hostname..."
-        style="width:100%;padding:12px 16px;font-size:13px;font-family:JetBrains Mono,monospace;background:#1C1C1C;border:2px solid #2A2A2A;border-radius:10px;color:#F0EDED;outline:none"/>
-      <div *ngIf="showDD&&hits.length" style="position:absolute;top:100%;left:0;right:0;z-index:20;background:#1C1C1C;border:1px solid #2A2A2A;border-radius:0 0 10px 10px;max-height:300px;overflow-y:auto">
-        <div *ngFor="let c of hits" (click)="pick(c)" style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #2A2A2A;display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='#242424'" onmouseout="this.style.background='transparent'">
+        style="width:100%;padding:12px 16px;font-size:13px;font-family:JetBrains Mono,monospace;background:var(--bg-card);border:2px solid var(--border);border-radius:10px;color:var(--text-1);outline:none"/>
+      <div *ngIf="showDD&&hits.length" style="position:absolute;top:100%;left:0;right:0;z-index:20;background:var(--bg-card);border:1px solid var(--border);border-radius:0 0 10px 10px;max-height:300px;overflow-y:auto">
+        <div *ngFor="let c of hits" (click)="pick(c)" style="padding:10px 16px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
           <div>
-            <div style="font-size:12px;font-weight:600;color:#F0EDED">{{c.hostname||c.mac}}</div>
-            <div style="font-size:10px;color:#706868;font-family:JetBrains Mono,monospace">{{c.mac}} &#8212; {{c.ip||'No IP'}} &#8212; {{c.ssid}} &#8212; {{c.ap_name}}</div>
+            <div style="font-size:12px;font-weight:600;color:var(--text-1)">{{c.hostname||c.mac}}</div>
+            <div style="font-size:10px;color:var(--text-3);font-family:JetBrains Mono,monospace">{{c.mac}} &#8212; {{c.ip||'No IP'}} &#8212; {{c.ssid}} &#8212; {{c.ap_name}}</div>
           </div>
           <span style="padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700" [style.color]="qc(c.quality_score)" [style.background]="qc(c.quality_score)+'18'">{{c.quality_score}}</span>
         </div>
@@ -31,76 +31,76 @@ declare var Chart: any;
     </div>
     <div style="display:flex;gap:4px">
       <button *ngFor="let r of ranges" (click)="setRange(r.v)"
-        style="padding:8px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid #2A2A2A;transition:all .2s"
-        [style.background]="range===r.v?'rgba(62,107,176,0.10)':'#1C1C1C'" [style.color]="range===r.v?'#6E97D6':'#706868'"
-        [style.borderColor]="range===r.v?'rgba(62,107,176,0.3)':'#2A2A2A'">{{r.l}}</button>
+        style="padding:8px 14px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);transition:all .2s"
+        [style.background]="range===r.v?'rgba(62,107,176,0.10)':'var(--bg-card)'" [style.color]="range===r.v?'var(--brand-light)':'var(--text-3)'"
+        [style.borderColor]="range===r.v?'rgba(62,107,176,0.3)':'var(--border)'">{{r.l}}</button>
     </div>
   </div>
 
   <app-spinner *ngIf="loading && !mac" label="Loading tracking data…"></app-spinner>
 
-  <div *ngIf="!mac && !loading" style="background:#1C1C1C;border:1px solid #2A2A2A;border-radius:10px;padding:18px 20px;margin-bottom:16px">
-    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#504848;margin-bottom:12px">COLLECTOR STATUS</div>
+  <div *ngIf="!mac && !loading" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:16px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:12px">COLLECTOR STATUS</div>
     <div style="display:flex;gap:24px;font-size:12px">
-      <div><span style="color:#706868">Snapshots:</span> <span style="color:#C8102E;font-family:JetBrains Mono,monospace;font-weight:600">{{status?.snapshots||0}}</span></div>
-      <div><span style="color:#706868">Roaming Events:</span> <span style="color:#E8A838;font-family:JetBrains Mono,monospace;font-weight:600">{{status?.roaming_events||0}}</span></div>
-      <div><span style="color:#706868">Last Poll:</span> <span style="color:#A8A0A0;font-family:JetBrains Mono,monospace">{{status?.last_collection||'Never'}}</span></div>
+      <div><span style="color:var(--text-3)">Snapshots:</span> <span style="color:#C8102E;font-family:JetBrains Mono,monospace;font-weight:600">{{status?.snapshots||0}}</span></div>
+      <div><span style="color:var(--text-3)">Roaming Events:</span> <span style="color:#E8A838;font-family:JetBrains Mono,monospace;font-weight:600">{{status?.roaming_events||0}}</span></div>
+      <div><span style="color:var(--text-3)">Last Poll:</span> <span style="color:var(--text-2);font-family:JetBrains Mono,monospace">{{status?.last_collection||'Never'}}</span></div>
     </div>
   </div>
 
-  <div *ngIf="!mac&&!loading&&gRoams.length" style="background:#1C1C1C;border:1px solid #2A2A2A;border-radius:10px;padding:18px 20px;margin-bottom:16px">
-    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#504848;margin-bottom:12px">RECENT ROAMING EVENTS</div>
-    <div *ngFor="let r of gRoams" style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #2A2A2A;font-size:12px">
-      <span style="color:#706868;font-family:JetBrains Mono,monospace;font-size:10px;min-width:70px">{{fmtT(r.timestamp)}}</span>
+  <div *ngIf="!mac&&!loading&&gRoams.length" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:16px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:12px">RECENT ROAMING EVENTS</div>
+    <div *ngFor="let r of gRoams" style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="color:var(--text-3);font-family:JetBrains Mono,monospace;font-size:10px;min-width:70px">{{fmtT(r.timestamp)}}</span>
       <span style="color:#C8102E;font-family:JetBrains Mono,monospace;cursor:pointer;min-width:130px" (click)="goMac(r.mac)">{{r.mac}}</span>
       <span style="color:#E07830;font-weight:600">{{r.from_ap}}</span>
-      <span style="color:#504848">&#8594;</span>
+      <span style="color:var(--text-muted)">&#8594;</span>
       <span style="color:#34C759;font-weight:600">{{r.to_ap}}</span>
-      <span style="color:#706868">{{r.ssid}} / {{r.band}}</span>
+      <span style="color:var(--text-3)">{{r.ssid}} / {{r.band}}</span>
       <span style="font-family:JetBrains Mono,monospace;font-weight:700" [style.color]="qc(r.quality_after)">{{r.rssi_after}} dBm</span>
     </div>
   </div>
 
   <div *ngIf="mac">
-    <button (click)="back()" style="background:none;border:1px solid #2A2A2A;border-radius:8px;color:#706868;padding:8px 16px;cursor:pointer;font-size:12px;font-weight:600;margin-bottom:16px">&#8592; Back to overview</button>
+    <button (click)="back()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-3);padding:8px 16px;cursor:pointer;font-size:12px;font-weight:600;margin-bottom:16px">&#8592; Back to overview</button>
 
     <div *ngIf="sum" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px">
-      <div *ngFor="let k of cards" style="background:#1C1C1C;border:1px solid #2A2A2A;border-radius:10px;padding:14px;text-align:center">
-        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;color:#504848;margin-bottom:8px">{{k.label}}</div>
-        <div style="font-family:JetBrains Mono,monospace;font-size:20px;font-weight:700" [style.color]="k.color">{{k.value}}<small *ngIf="k.unit" style="font-size:10px;color:#706868;margin-left:2px">{{k.unit}}</small></div>
-        <div *ngIf="k.sub" style="font-size:10px;color:#706868;margin-top:4px;font-family:JetBrains Mono,monospace">{{k.sub}}</div>
+      <div *ngFor="let k of cards" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:8px">{{k.label}}</div>
+        <div style="font-family:JetBrains Mono,monospace;font-size:20px;font-weight:700" [style.color]="k.color">{{k.value}}<small *ngIf="k.unit" style="font-size:10px;color:var(--text-3);margin-left:2px">{{k.unit}}</small></div>
+        <div *ngIf="k.sub" style="font-size:10px;color:var(--text-3);margin-top:4px;font-family:JetBrains Mono,monospace">{{k.sub}}</div>
       </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
-      <div style="background:#1C1C1C;border:1px solid #2A2A2A;border-radius:10px;padding:18px 20px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#504848;margin-bottom:12px">SIGNAL QUALITY OVER TIME</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:12px">SIGNAL QUALITY OVER TIME</div>
         <canvas #qualityChart style="width:100%;height:200px"></canvas>
       </div>
-      <div style="background:#1C1C1C;border:1px solid #2A2A2A;border-radius:10px;padding:18px 20px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#504848;margin-bottom:12px">RSSI / SNR OVER TIME</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:12px">RSSI / SNR OVER TIME</div>
         <canvas #rssiChart style="width:100%;height:200px"></canvas>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
-      <div style="background:#1C1C1C;border:1px solid #2A2A2A;border-radius:10px;padding:18px 20px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#504848;margin-bottom:12px">DATA RATE (Mbps)</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:12px">DATA RATE (Mbps)</div>
         <canvas #rateChart style="width:100%;height:200px"></canvas>
       </div>
-      <div style="background:#1C1C1C;border:1px solid #2A2A2A;border-radius:10px;padding:18px 20px">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#504848;margin-bottom:12px">AP ROAMING TIMELINE</div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:12px">AP ROAMING TIMELINE</div>
         <canvas #apChart style="width:100%;height:200px"></canvas>
       </div>
     </div>
 
-    <div *ngIf="roams.length" style="background:#1C1C1C;border:1px solid #2A2A2A;border-radius:10px;padding:18px 20px">
-      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#504848;margin-bottom:12px">ROAMING EVENTS ({{roams.length}})</div>
-      <div *ngFor="let r of roams" style="display:flex;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid #2A2A2A;font-size:12px">
-        <span style="color:#A8A0A0;font-family:JetBrains Mono,monospace;min-width:140px">{{fmtDT(r.timestamp)}}</span>
+    <div *ngIf="roams.length" style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px 20px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--text-muted);margin-bottom:12px">ROAMING EVENTS ({{roams.length}})</div>
+      <div *ngFor="let r of roams" style="display:flex;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px">
+        <span style="color:var(--text-2);font-family:JetBrains Mono,monospace;min-width:140px">{{fmtDT(r.timestamp)}}</span>
         <span style="color:#E07830;font-weight:600;min-width:140px">{{r.from_ap}}</span>
-        <span style="color:#504848">&#8594;</span>
+        <span style="color:var(--text-muted)">&#8594;</span>
         <span style="color:#34C759;font-weight:600;min-width:140px">{{r.to_ap}}</span>
-        <span style="color:#706868">{{r.band}} / Ch {{r.channel}}</span>
+        <span style="color:var(--text-3)">{{r.band}} / Ch {{r.channel}}</span>
         <span style="font-family:JetBrains Mono,monospace;font-weight:700" [style.color]="rc(r.rssi_after)">{{r.rssi_after}} dBm</span>
         <span style="font-family:JetBrains Mono,monospace" [style.color]="qc(r.quality_after)">Q:{{r.quality_after}}</span>
       </div>
@@ -188,7 +188,7 @@ export class ClientTrackingComponent implements OnInit, OnDestroy {
           { label: "AVG QUALITY", value: d.avg_quality || 0, unit: "/100", color: this.qc(d.avg_quality || 0), sub: `${d.min_quality || 0} / ${d.max_quality || 0}` },
           { label: "DATA RATE", value: d.avg_rate || 0, unit: "Mbps", color: "#C8102E", sub: "max " + d.max_rate },
           { label: "ROAMING", value: d.roam_count || 0, unit: "", color: d.roam_count > 0 ? "#E8A838" : "#34C759", sub: (d.aps_used || []).length + " APs" },
-          { label: "SAMPLES", value: d.count || 0, unit: "", color: "#A8A0A0", sub: r },
+          { label: "SAMPLES", value: d.count || 0, unit: "", color: "var(--text-2)", sub: r },
         ];
       }, error: () => {}
     });
@@ -221,10 +221,10 @@ export class ClientTrackingComponent implements OnInit, OnDestroy {
     if (!this.cjs || !this.tl.length) return;
     this.killCharts();
     const labels = this.tl.map(t => this.fmtT(t.timestamp));
-    const gc = "#2A2A2A", tc = "#504848";
+    const gc = "var(--border)", tc = "var(--text-muted)";
     const base = {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, labels: { color: "#706868", font: { size: 10, family: "JetBrains Mono" } } } },
+      plugins: { legend: { display: true, labels: { color: "var(--text-3)", font: { size: 10, family: "JetBrains Mono" } } } },
       scales: {
         x: { ticks: { color: tc, font: { size: 9, family: "JetBrains Mono" }, maxTicksLimit: 12 }, grid: { color: gc } },
         y: { ticks: { color: tc, font: { size: 10, family: "JetBrains Mono" } }, grid: { color: gc } },
