@@ -8,6 +8,7 @@ import { SystemInfoComponent } from './components/system-info/system-info.compon
 import { ClientTrackingComponent } from './components/client-tracking/client-tracking.component';
 import { RoamingGraphComponent } from './components/roaming-graph/roaming-graph.component';
 import { ApMapComponent } from './components/ap-map/ap-map.component';
+import { ChannelConflictsComponent } from './components/channel-conflicts/channel-conflicts.component';
 import { LoginComponent } from './components/login/login.component';
 import { AdminComponent } from './components/admin/admin.component';
 import { SettingsComponent } from './components/settings/settings.component';
@@ -23,6 +24,7 @@ export const routes: Routes = [
   { path: 'clients', component: ClientListComponent, canActivate: [authGuard] },
   { path: 'client-experience', component: ClientExperienceComponent, canActivate: [authGuard] },
   { path: 'wlans', component: WlanListComponent, canActivate: [authGuard] },
+  { path: 'rf-conflicts', component: ChannelConflictsComponent, canActivate: [authGuard] },
   { path: 'system', component: SystemInfoComponent, canActivate: [authGuard] },
   { path: 'roaming-graph', component: RoamingGraphComponent, canActivate: [authGuard] },
   { path: 'tracking', component: ClientTrackingComponent, canActivate: [authGuard] },

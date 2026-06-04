@@ -37,6 +37,16 @@ def _to_list(data):
     return []
 
 
+def _first(d, *keys, default=None):
+    """Return the first present, non-null key from a dict (tolerates YANG
+    field-name variations across IOS-XE trains)."""
+    if isinstance(d, dict):
+        for k in keys:
+            if d.get(k) is not None:
+                return d[k]
+    return default
+
+
 def _elapsed_seconds(iso_timestamp):
     if not iso_timestamp or "1970" in str(iso_timestamp):
         return 0
@@ -63,6 +73,11 @@ _PATHS = {
     "wlan":           "Cisco-IOS-XE-wireless-wlan-cfg:wlan-cfg-data",
     "rf":             "Cisco-IOS-XE-wireless-rrm-oper:rrm-oper-data",
     "interfaces":     "Cisco-IOS-XE-interfaces-oper:interfaces",
+    # RF / RRM troubleshooting (validated against IOS-XE 17.x RRM oper)
+    "rrm_load":       "Cisco-IOS-XE-wireless-rrm-oper:rrm-oper-data/rrm-measurement",
+    "rrm_nbr":        "Cisco-IOS-XE-wireless-rrm-oper:rrm-oper-data/ap-auto-rf-dot11-data",
+    "radio_oper":     "Cisco-IOS-XE-wireless-access-point-oper:access-point-oper-data/radio-oper-data",
+    "ap_name_map":    "Cisco-IOS-XE-wireless-access-point-oper:access-point-oper-data/ap-name-mac-map",
 }
 
 # Protocol / band derivation tables
@@ -527,6 +542,209 @@ class C9800RestconfClient:
 
     def get_rf_data(self):
         return self._get(_PATHS["rf"])
+
+    # ── RF / Channel-conflict analysis ─────────────────
+    @staticmethod
+    def _band_label(band, slot, ch):
+        b = _str(band).lower()
+        if "6-ghz" in b or "6ghz" in b:               return "6 GHz"
+        if "2-dot-4" in b or "2.4" in b or "11bg" in b: return "2.4 GHz"
+        if "5-ghz" in b or "5ghz" in b or "11a" in b:  return "5 GHz"
+        if slot == 0:                        return "2.4 GHz"
+        if slot == 1:                        return "5 GHz"
+        if slot == 2:                        return "6 GHz"
+        if 1 <= ch <= 14:                    return "2.4 GHz"
+        if 36 <= ch <= 177:                  return "5 GHz"
+        return "Unknown"
+
+    # A co/adjacent-channel conflict only counts when the two radios actually
+    # hear each other this strongly — otherwise same-channel is just RRM reuse.
+    NEIGHBOR_RSSI_THRESHOLD = -80
+
+    def get_rf_analysis(self):
+        """Per-radio RF telemetry (channel, utilization, noise, TX) plus
+        neighbor-aware co-channel / adjacent-channel conflict detection.
+        Validated against IOS-XE 17.x: channel/width/band/TX from
+        radio-oper-data, util/noise from rrm-measurement, RF neighbors from
+        ap-auto-rf-dot11-data."""
+        paths = [_PATHS["rrm_load"], _PATHS["rrm_nbr"], _PATHS["radio_oper"], _PATHS["ap_name_map"]]
+        res = self._get_parallel(paths)
+
+        name_by_mac = {}
+        for m in _to_list(res.get(_PATHS["ap_name_map"], {}).get(
+                "Cisco-IOS-XE-wireless-access-point-oper:ap-name-mac-map", [])):
+            name_by_mac[_str(m.get("wtp-mac")).lower()] = _str(
+                _first(m, "wtp-name", "ap-name"), _str(m.get("wtp-mac")))
+
+        radios = {}
+
+        def slot_radio(mac, slot):
+            return radios.setdefault((_str(mac).lower(), _int(slot)),
+                                     {"mac": _str(mac), "slot": _int(slot)})
+
+        # Channel / width / band / TX power from radio-oper-data
+        for it in _to_list(res.get(_PATHS["radio_oper"], {}).get(
+                "Cisco-IOS-XE-wireless-access-point-oper:radio-oper-data", [])):
+            if "remote-lan" in _str(it.get("radio-type")):   # non-Wi-Fi radio
+                continue
+            r = slot_radio(it.get("wtp-mac"), it.get("radio-slot-id"))
+            cfg = (it.get("phy-ht-cfg") or {}).get("cfg-data", {}) or {}
+            r["channel"] = _int(cfg.get("curr-freq"))
+            w = _int(cfg.get("chan-width"))
+            r["width"] = f"{w} MHz" if w else ""
+            r["band"] = self._band_label(_first(it, "current-active-band", "radio-type", default=""),
+                                         r["slot"], r["channel"])
+            r["oper_up"] = "up" in _str(it.get("oper-state")).lower()
+            bands = _to_list(it.get("radio-band-info", []))
+            b0 = bands[0] if bands else {}
+            r["tx_level"] = _int(((b0.get("phy-tx-pwr-cfg") or {}).get("cfg-data", {}) or {})
+                                 .get("current-tx-power-level"))
+            r["tx_dbm"] = _int(((b0.get("phy-tx-pwr-lvl-cfg") or {}).get("cfg-data", {}) or {})
+                               .get("curr-tx-power-in-dbm"))
+
+        # Utilization + noise from rrm-measurement
+        for it in _to_list(res.get(_PATHS["rrm_load"], {}).get(
+                "Cisco-IOS-XE-wireless-rrm-oper:rrm-measurement", [])):
+            r = slot_radio(it.get("wtp-mac"), it.get("radio-slot-id"))
+            load = it.get("load") or {}
+            r["util"] = _int(_first(load, "cca-util-percentage", "rx-noise-channel-utilization"))
+            r["clients"] = _int(load.get("stations"))
+            # noise is nested: noise -> noise -> noise-data[] {chan, noise}
+            ndata = _to_list(((it.get("noise") or {}).get("noise") or {}).get("noise-data", []))
+            r["_noise"] = {_int(n.get("chan")): _int(n.get("noise")) for n in ndata}
+
+        # RF neighbors from ap-auto-rf-dot11-data → (mac, slot, rssi) heard by this radio
+        for it in _to_list(res.get(_PATHS["rrm_nbr"], {}).get(
+                "Cisco-IOS-XE-wireless-rrm-oper:ap-auto-rf-dot11-data", [])):
+            r = slot_radio(it.get("wtp-mac"), it.get("radio-slot-id"))
+            nbrs = []
+            for n in _to_list((it.get("neighbor-radio-info") or {}).get("neighbor-radio-list", [])):
+                ni = n.get("neighbor-radio-info") or {}
+                nbrs.append((_str(ni.get("neighbor-radio-mac")).lower(),
+                             _int(ni.get("neighbor-radio-slot-id")),
+                             _int(ni.get("rssi"))))
+            r["nbrs"] = nbrs
+
+        pub = {}
+        for key, r in radios.items():
+            ch = r.get("channel", 0)
+            noise_map = r.get("_noise", {})
+            noise = noise_map.get(ch)
+            if noise is None and noise_map:
+                noise = max(noise_map.values())          # closest-to-0 = noisiest
+            pub[key] = {
+                "ap_name": name_by_mac.get(r["mac"].lower(), r["mac"]),
+                "mac": r["mac"], "slot": r["slot"],
+                "band": r.get("band") or self._band_label("", r["slot"], ch),
+                "channel": ch, "width": r.get("width", ""),
+                "utilization": r.get("util", 0),
+                "noise_dbm": _int(noise) if noise is not None else 0,
+                "interference": 0,
+                "tx_level": r.get("tx_level", 0),
+                "tx_dbm": r.get("tx_dbm", 0),
+                "clients": r.get("clients", 0),
+            }
+
+        conflicts = self._detect_conflicts(radios, pub)
+        summary = {
+            "critical": sum(1 for c in conflicts if c["severity"] == "critical"),
+            "high":     sum(1 for c in conflicts if c["severity"] == "high"),
+            "medium":   sum(1 for c in conflicts if c["severity"] == "medium"),
+            "affected_aps": len({a["mac"] for c in conflicts for a in c["radios"]}),
+        }
+        return {"summary": summary, "conflicts": conflicts,
+                "radios": sorted(pub.values(), key=lambda r: (r["band"], r["channel"]))}
+
+    @staticmethod
+    def _components(adj):
+        """Connected components (size ≥ 2) of an undirected adjacency dict."""
+        seen, comps = set(), []
+        for start in adj:
+            if start in seen:
+                continue
+            stack, comp = [start], []
+            while stack:
+                x = stack.pop()
+                if x in seen:
+                    continue
+                seen.add(x)
+                comp.append(x)
+                stack.extend(adj[x] - seen)
+            if len(comp) >= 2:
+                comps.append(comp)
+        return comps
+
+    def _detect_conflicts(self, radios, pub):
+        """Neighbor-aware: two radios conflict only if they hear each other
+        ≥ NEIGHBOR_RSSI_THRESHOLD AND are on the same (co) or overlapping
+        2.4 GHz (adjacent) channel — not merely sharing a reused channel."""
+        co_adj, adj_adj = {}, {}
+        best_rssi = {}
+
+        def link(d, a, b):
+            d.setdefault(a, set()).add(b)
+            d.setdefault(b, set()).add(a)
+
+        for key, r in radios.items():
+            ch = r.get("channel", 0)
+            if ch <= 0:
+                continue
+            band = pub[key]["band"]
+            for (nmac, nslot, rssi) in r.get("nbrs", []):
+                nk = (nmac, nslot)
+                if nk not in radios or rssi < self.NEIGHBOR_RSSI_THRESHOLD:
+                    continue
+                nch = radios[nk].get("channel", 0)
+                if nch <= 0 or pub[nk]["band"] != band:
+                    continue
+                if nch == ch:
+                    link(co_adj, key, nk)
+                    best_rssi[key] = max(best_rssi.get(key, -128), rssi)
+                    best_rssi[nk] = max(best_rssi.get(nk, -128), rssi)
+                elif band == "2.4 GHz" and 1 <= abs(nch - ch) <= 4:
+                    link(adj_adj, key, nk)
+                    best_rssi[key] = max(best_rssi.get(key, -128), rssi)
+                    best_rssi[nk] = max(best_rssi.get(nk, -128), rssi)
+
+        conflicts = []
+        conflicts += self._clusters(co_adj, pub, best_rssi, "co-channel")
+        conflicts += self._clusters(adj_adj, pub, best_rssi, "adjacent")
+        order = {"critical": 0, "high": 1, "medium": 2}
+        conflicts.sort(key=lambda c: (order.get(c["severity"], 9), -c["ap_count"]))
+        return conflicts
+
+    def _clusters(self, adj, pub, best_rssi, ctype):
+        out = []
+        for comp in self._components(adj):
+            members = sorted((pub[k] for k in comp), key=lambda m: -m["utilization"])
+            max_util = max(m["utilization"] for m in members)
+            strongest = max((best_rssi.get(k, -128) for k in comp), default=-128)
+            names = " and ".join(m["ap_name"] for m in members[:2])
+            more = f" (+{len(members) - 2} more)" if len(members) > 2 else ""
+            band = members[0]["band"]
+            if ctype == "co-channel":
+                ch = members[0]["channel"]
+                # Utilization-primary (actual airtime impact); strong mutual
+                # RSSI escalates a busy cluster but doesn't alone make it critical.
+                sev = ("critical" if (max_util >= 50 or (max_util >= 30 and strongest >= -60))
+                       else "high" if (max_util >= 25 or strongest >= -65) else "medium")
+                title = f"Co-Channel · {band}"
+                detail = (f"{names}{more} on channel {ch} hear each other "
+                          f"(up to {strongest} dBm), max utilization {max_util}%.")
+            else:
+                chans = sorted({m["channel"] for m in members})
+                ch = chans[0]
+                sev = ("high" if (max_util >= 40 or strongest >= -60)
+                       else "medium" if (max_util >= 20 or strongest >= -68) else "medium")
+                title = f"Adjacent Channel · {band}"
+                detail = (f"{names}{more} overlap on 2.4 GHz channels "
+                          f"{', '.join(map(str, chans))} (up to {strongest} dBm).")
+            out.append({
+                "type": ctype, "band": band, "channel": ch, "severity": sev,
+                "ap_count": len(members), "title": title, "detail": detail,
+                "radios": members,
+            })
+        return out
 
     def get_interfaces(self):
         d = self._get(_PATHS["interfaces"])

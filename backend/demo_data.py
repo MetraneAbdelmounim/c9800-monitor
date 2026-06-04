@@ -175,6 +175,11 @@ class DemoClient:
     def get_rf_data(self):
         return {"status": "demo", "message": "RF data available in live mode"}
 
+    def get_rf_analysis(self):
+        # No simulated RF telemetry — real RRM data only (live mode).
+        return {"summary": {"critical": 0, "high": 0, "medium": 0, "affected_aps": 0},
+                "conflicts": [], "radios": []}
+
     def get_interfaces(self):
         return {"interfaces": [
             {"name": "GigabitEthernet0/0/0", "type": "iana-if-type:ethernetCsmacd", "enabled": True, "oper_status": "up"},

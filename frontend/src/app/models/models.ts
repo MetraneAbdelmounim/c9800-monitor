@@ -190,3 +190,34 @@ export interface ApPlacement {
   x: number;       // 0-100 % of image width
   y: number;       // 0-100 % of image height
 }
+
+// ── RF / Channel conflicts ─────────────────────────────
+export interface RfRadio {
+  ap_name: string;
+  mac: string;
+  slot: number;
+  band: string;
+  channel: number;
+  width: string;
+  utilization: number;   // %
+  noise_dbm: number;
+  interference: number;  // %
+  tx_level: number;      // 1-8 (1 = highest)
+  tx_dbm?: number;
+  clients: number;
+}
+export interface RfConflict {
+  type: 'co-channel' | 'adjacent';
+  band: string;
+  channel: number;
+  severity: 'critical' | 'high' | 'medium';
+  ap_count: number;
+  title: string;
+  detail: string;
+  radios: RfRadio[];
+}
+export interface RfAnalysis {
+  summary: { critical: number; high: number; medium: number; affected_aps: number };
+  conflicts: RfConflict[];
+  radios: RfRadio[];
+}

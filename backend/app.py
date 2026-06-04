@@ -196,6 +196,11 @@ def wlans():
 def rf():
     return jsonify(client.get_rf_data())
 
+@app.route("/api/rf/analysis")
+@require_auth
+def rf_analysis():
+    return jsonify(client.get_rf_analysis())
+
 @app.route("/api/interfaces")
 @require_auth
 def interfaces():
