@@ -650,46 +650,24 @@ class C9800RestconfClient:
             "critical": sum(1 for c in conflicts if c["severity"] == "critical"),
             "high":     sum(1 for c in conflicts if c["severity"] == "high"),
             "medium":   sum(1 for c in conflicts if c["severity"] == "medium"),
-            "affected_aps": len({a["mac"] for c in conflicts for a in c["radios"]}),
+            "affected_aps": len({c["focal"]["mac"] for c in conflicts}),
         }
         return {"summary": summary, "conflicts": conflicts,
                 "radios": sorted(pub.values(), key=lambda r: (r["band"], r["channel"]))}
 
-    @staticmethod
-    def _components(adj):
-        """Connected components (size ≥ 2) of an undirected adjacency dict."""
-        seen, comps = set(), []
-        for start in adj:
-            if start in seen:
-                continue
-            stack, comp = [start], []
-            while stack:
-                x = stack.pop()
-                if x in seen:
-                    continue
-                seen.add(x)
-                comp.append(x)
-                stack.extend(adj[x] - seen)
-            if len(comp) >= 2:
-                comps.append(comp)
-        return comps
-
     def _detect_conflicts(self, radios, pub):
-        """Neighbor-aware: two radios conflict only if they hear each other
-        ≥ NEIGHBOR_RSSI_THRESHOLD AND are on the same (co) or overlapping
-        2.4 GHz (adjacent) channel — not merely sharing a reused channel."""
-        co_adj, adj_adj = {}, {}
-        best_rssi = {}
-
-        def link(d, a, b):
-            d.setdefault(a, set()).add(b)
-            d.setdefault(b, set()).add(a)
+        """AP-centric: one conflict per radio that hears co-channel (or
+        overlapping 2.4 GHz) neighbors ≥ NEIGHBOR_RSSI_THRESHOLD. The neighbor
+        list is that radio's OWN direct neighbors (with the RSSI it hears them
+        at) — mirroring the WLC 'Neighboring APs' table, no transitive grouping."""
+        conflicts = []
 
         for key, r in radios.items():
             ch = r.get("channel", 0)
             if ch <= 0:
                 continue
             band = pub[key]["band"]
+            co_n, adj_n = [], []
             for (nmac, nslot, rssi) in r.get("nbrs", []):
                 nk = (nmac, nslot)
                 if nk not in radios or rssi < self.NEIGHBOR_RSSI_THRESHOLD:
@@ -697,54 +675,50 @@ class C9800RestconfClient:
                 nch = radios[nk].get("channel", 0)
                 if nch <= 0 or pub[nk]["band"] != band:
                     continue
+                nb = {"ap_name": pub[nk]["ap_name"], "mac": pub[nk]["mac"],
+                      "slot": pub[nk]["slot"], "channel": nch, "rssi": rssi,
+                      "utilization": pub[nk]["utilization"], "noise_dbm": pub[nk]["noise_dbm"]}
                 if nch == ch:
-                    link(co_adj, key, nk)
-                    best_rssi[key] = max(best_rssi.get(key, -128), rssi)
-                    best_rssi[nk] = max(best_rssi.get(nk, -128), rssi)
+                    co_n.append(nb)
                 elif band == "2.4 GHz" and 1 <= abs(nch - ch) <= 4:
-                    link(adj_adj, key, nk)
-                    best_rssi[key] = max(best_rssi.get(key, -128), rssi)
-                    best_rssi[nk] = max(best_rssi.get(nk, -128), rssi)
+                    adj_n.append(nb)
 
-        conflicts = []
-        conflicts += self._clusters(co_adj, pub, best_rssi, "co-channel")
-        conflicts += self._clusters(adj_adj, pub, best_rssi, "adjacent")
+            focal = pub[key]
+            util = focal["utilization"]
+
+            if co_n:
+                co_n.sort(key=lambda x: -x["rssi"])
+                strongest, n = co_n[0]["rssi"], len(co_n)
+                sev = ("critical" if (util >= 60 or (util >= 40 and n >= 2) or strongest >= -52)
+                       else "high" if (n >= 3 or strongest >= -62 or util >= 25)
+                       else "medium")
+                conflicts.append({
+                    "type": "co-channel", "band": band, "channel": ch, "severity": sev,
+                    "ap_count": n + 1, "neighbor_count": n, "rssi": strongest,
+                    "title": f"Co-Channel · {band}", "focal": focal,
+                    "detail": f"{focal['ap_name']} (ch {ch}, {util}% util) has {n} co-channel "
+                              f"neighbor{'s' if n != 1 else ''} on channel {ch}; "
+                              f"strongest heard at {strongest} dBm.",
+                    "neighbors": co_n,
+                })
+
+            if adj_n:
+                adj_n.sort(key=lambda x: -x["rssi"])
+                strongest, n = adj_n[0]["rssi"], len(adj_n)
+                sev = "high" if (n >= 3 or strongest >= -58 or util >= 40) else "medium"
+                conflicts.append({
+                    "type": "adjacent", "band": "2.4 GHz", "channel": ch, "severity": sev,
+                    "ap_count": n + 1, "neighbor_count": n, "rssi": strongest,
+                    "title": "Adjacent Channel · 2.4 GHz", "focal": focal,
+                    "detail": f"{focal['ap_name']} (ch {ch}) overlaps {n} adjacent-channel "
+                              f"neighbor{'s' if n != 1 else ''}; strongest at {strongest} dBm.",
+                    "neighbors": adj_n,
+                })
+
         order = {"critical": 0, "high": 1, "medium": 2}
-        conflicts.sort(key=lambda c: (order.get(c["severity"], 9), -c["ap_count"]))
+        conflicts.sort(key=lambda c: (order.get(c["severity"], 9),
+                                      -c["neighbor_count"], -c["rssi"]))
         return conflicts
-
-    def _clusters(self, adj, pub, best_rssi, ctype):
-        out = []
-        for comp in self._components(adj):
-            members = sorted((pub[k] for k in comp), key=lambda m: -m["utilization"])
-            max_util = max(m["utilization"] for m in members)
-            strongest = max((best_rssi.get(k, -128) for k in comp), default=-128)
-            names = " and ".join(m["ap_name"] for m in members[:2])
-            more = f" (+{len(members) - 2} more)" if len(members) > 2 else ""
-            band = members[0]["band"]
-            if ctype == "co-channel":
-                ch = members[0]["channel"]
-                # Utilization-primary (actual airtime impact); strong mutual
-                # RSSI escalates a busy cluster but doesn't alone make it critical.
-                sev = ("critical" if (max_util >= 50 or (max_util >= 30 and strongest >= -60))
-                       else "high" if (max_util >= 25 or strongest >= -65) else "medium")
-                title = f"Co-Channel · {band}"
-                detail = (f"{names}{more} on channel {ch} hear each other "
-                          f"(up to {strongest} dBm), max utilization {max_util}%.")
-            else:
-                chans = sorted({m["channel"] for m in members})
-                ch = chans[0]
-                sev = ("high" if (max_util >= 40 or strongest >= -60)
-                       else "medium" if (max_util >= 20 or strongest >= -68) else "medium")
-                title = f"Adjacent Channel · {band}"
-                detail = (f"{names}{more} overlap on 2.4 GHz channels "
-                          f"{', '.join(map(str, chans))} (up to {strongest} dBm).")
-            out.append({
-                "type": ctype, "band": band, "channel": ch, "severity": sev,
-                "ap_count": len(members), "title": title, "detail": detail,
-                "radios": members,
-            })
-        return out
 
     def get_interfaces(self):
         d = self._get(_PATHS["interfaces"])

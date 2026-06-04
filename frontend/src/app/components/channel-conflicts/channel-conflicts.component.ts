@@ -18,6 +18,17 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
   error = '';
   private iv: any;
 
+  // Severity filter (medium hidden by default — usually low-impact + numerous)
+  show: Record<'critical' | 'high' | 'medium', boolean> = { critical: true, high: true, medium: false };
+
+  get filtered(): RfConflict[] {
+    return this.data ? this.data.conflicts.filter(c => this.show[c.severity]) : [];
+  }
+  sevCount(s: 'critical' | 'high' | 'medium'): number {
+    return this.data ? this.data.conflicts.filter(c => c.severity === s).length : 0;
+  }
+  toggleSev(s: 'critical' | 'high' | 'medium') { this.show[s] = !this.show[s]; }
+
   ngOnInit() {
     this.load();
     this.iv = setInterval(() => this.load(), 30000);
@@ -46,6 +57,11 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
     if (n >= -90) return '#E8A838';
     return 'var(--green)';
   }
-  radioUp(r: RfRadio): boolean { return r.channel > 0; }
-  trackByConflict = (_: number, c: RfConflict) => c.type + c.band + c.channel;
+  rssiColor(r: number): string {
+    // stronger (less negative) co-channel neighbor = worse interference
+    if (r >= -60) return '#C8102E';
+    if (r >= -72) return '#E8A838';
+    return 'var(--green)';
+  }
+  trackByConflict = (_: number, c: RfConflict) => c.type + c.focal.mac + c.focal.slot;
 }

@@ -206,15 +206,27 @@ export interface RfRadio {
   tx_dbm?: number;
   clients: number;
 }
+export interface RfNeighbor {
+  ap_name: string;
+  mac: string;
+  slot: number;
+  channel: number;
+  rssi: number;          // how the focal AP hears this neighbor
+  utilization: number;
+  noise_dbm: number;
+}
 export interface RfConflict {
   type: 'co-channel' | 'adjacent';
   band: string;
   channel: number;
   severity: 'critical' | 'high' | 'medium';
   ap_count: number;
+  neighbor_count: number;
+  rssi?: number;            // strongest neighbor RSSI
   title: string;
   detail: string;
-  radios: RfRadio[];
+  focal: RfRadio;
+  neighbors: RfNeighbor[];
 }
 export interface RfAnalysis {
   summary: { critical: number; high: number; medium: number; affected_aps: number };

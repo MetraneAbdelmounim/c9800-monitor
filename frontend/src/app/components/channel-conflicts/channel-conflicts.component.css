@@ -40,6 +40,22 @@
 .empty-title { font-size: 16px; font-weight: 700; color: var(--text-2); margin-bottom: 6px; }
 .empty-state p { font-size: 13px; }
 
+/* Severity filter bar */
+.filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.filter-lbl { font-size: 12px; color: var(--text-3); font-weight: 600; }
+.filter-chip {
+  font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 20px;
+  border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; color: #fff;
+}
+.filter-chip.crit { background: #C8102E; border-color: #C8102E; }
+.filter-chip.high { background: #E07830; border-color: #E07830; }
+.filter-chip.med  { background: #E8A838; border-color: #E8A838; color: #1A1F2B; }
+.filter-chip.off { background: transparent; color: var(--text-3); }
+.filter-chip.crit.off { border-color: rgba(200,16,46,0.4); }
+.filter-chip.high.off { border-color: rgba(224,120,48,0.4); }
+.filter-chip.med.off  { border-color: rgba(232,168,56,0.4); }
+.filter-count { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
 /* Conflict cards */
 .conflict {
   background: var(--bg-card); border: 1px solid var(--border);
@@ -66,6 +82,11 @@
 .radio-row {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 10px 0; border-top: 1px solid var(--border); font-size: 12px;
+}
+.radio-row.focal { background: var(--brand-10); margin: 0 -22px; padding: 10px 22px; border-top: none; }
+.r-tag {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--brand-light); background: var(--brand-20); padding: 2px 7px; border-radius: 4px;
 }
 .r-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
 .r-dot.up { background: var(--green); }
