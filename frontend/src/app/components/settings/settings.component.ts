@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { SettingsService, WlcSettings, ConnectionTestResult, DemoModeStatus, SetupStatus } from '../../services/settings.service';
+import { SettingsService, WlcSettings, ConnectionTestResult, DemoModeStatus, SetupStatus, CleanupSettings, CleanupSchedule } from '../../services/settings.service';
 
 @Component({
   selector: 'app-settings',
@@ -41,10 +41,76 @@ export class SettingsComponent implements OnInit {
   saveSuccess = signal<string | null>(null);
   testResult = signal<ConnectionTestResult | null>(null);
 
+  // ── Data-cleanup state ───────────────────────────────
+  cleanup = signal<CleanupSettings | null>(null);
+  clEnabled = false;
+  clSchedule: CleanupSchedule = 'weekly';
+  clRetention = 7;
+  clSaving = signal(false);
+  clRunning = signal(false);
+  clError = signal<string | null>(null);
+  clMsg = signal<string | null>(null);
+
+  readonly scheduleOptions: { value: CleanupSchedule; label: string }[] = [
+    { value: '5min', label: 'Every 5 minutes' },
+    { value: 'hourly', label: 'Every hour' },
+    { value: 'daily', label: 'Every day (midnight)' },
+    { value: 'weekly', label: 'Every Sunday (midnight)' },
+    { value: 'monthly', label: 'Every month (1st)' },
+  ];
+
   ngOnInit() {
     this.loadDemo();
     this.load();
+    this.loadCleanup();
     this.loadSetupStatus(this.route.snapshot.queryParamMap.get('initial') === '1');
+  }
+
+  // ── Cleanup ──────────────────────────────────────────
+  loadCleanup() {
+    this.svc.getCleanup().subscribe({
+      next: c => {
+        this.cleanup.set(c);
+        this.clEnabled = c.enabled;
+        this.clSchedule = c.schedule;
+        this.clRetention = c.retention_days;
+      },
+      error: () => this.cleanup.set(null),
+    });
+  }
+
+  saveCleanup() {
+    this.clError.set(null);
+    this.clMsg.set(null);
+    if (this.clRetention < 0) { this.clError.set('Retention days cannot be negative'); return; }
+    this.clSaving.set(true);
+    this.svc.saveCleanup({
+      enabled: this.clEnabled,
+      schedule: this.clSchedule,
+      retention_days: Math.floor(this.clRetention),
+    }).subscribe({
+      next: c => { this.cleanup.set(c); this.clSaving.set(false); this.clMsg.set('Cleanup schedule saved.'); },
+      error: err => { this.clSaving.set(false); this.clError.set(err?.error?.error || 'Failed to save cleanup settings'); },
+    });
+  }
+
+  runCleanupNow() {
+    if (!confirm(this.clRetention > 0
+      ? `Delete tracking/roaming records older than ${this.clRetention} day(s) now?`
+      : 'Delete ALL tracking/roaming history now?')) return;
+    this.clError.set(null);
+    this.clMsg.set(null);
+    this.clRunning.set(true);
+    this.svc.runCleanup().subscribe({
+      next: r => { this.clRunning.set(false); this.clMsg.set(`Removed ${r.deleted} record(s).`); this.loadCleanup(); },
+      error: err => { this.clRunning.set(false); this.clError.set(err?.error?.error || 'Cleanup failed'); },
+    });
+  }
+
+  cleanupTotal(): number {
+    const s = this.cleanup()?.stats;
+    if (!s) return 0;
+    return Object.values(s).reduce((a, b) => a + (b || 0), 0);
   }
 
   loadSetupStatus(forceBanner = false) {

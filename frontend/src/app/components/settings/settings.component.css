@@ -210,6 +210,20 @@ h1 { font-size: 22px; font-weight: 800; color: var(--text-1); margin-bottom: 4px
 .field input::-webkit-outer-spin-button,
 .field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
+/* Cleanup card: style the schedule <select> like the text inputs */
+.field select {
+  padding: 10px 12px;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-1);
+  font-family: inherit; font-size: 12px;
+  outline: none; transition: border-color 0.15s;
+}
+.field select:focus { border-color: var(--brand); }
+.field select:disabled { opacity: 0.5; }
+.card-sub.hint { margin-top: 10px; font-size: 11px; color: var(--text-3); }
+
 .checkbox {
   display: flex; align-items: center; gap: 8px;
   font-size: 12px; color: var(--text-2);

@@ -6,7 +6,9 @@
       "Bash(curl -k -s -o NUL -w \"root /restconf -> HTTP %{http_code} | total=%{time_total}s\\\\n\" --max-time 15 -u admin:P@ss2025 https://192.168.100.16:443/restconf)",
       "Bash(python -c \"import requests; print\\('RetryError ok:', requests.exceptions.RetryError\\); import restconf_client; print\\('module import ok'\\)\")",
       "Bash(python -m py_compile app.py)",
-      "Bash(python -m py_compile app.py map_routes.py)"
+      "Bash(python -m py_compile app.py map_routes.py)",
+      "Bash(git branch *)",
+      "Bash(git push *)"
     ]
   }
 }

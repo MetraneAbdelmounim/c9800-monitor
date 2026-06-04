@@ -16,7 +16,8 @@ from map_routes import map_bp, init_map
 from auth import init_auth, bootstrap_admin, require_auth
 from auth_routes import auth_bp
 from settings import init_settings, get_wlc_settings, get_demo_mode_override, get_setup_complete
-from settings_routes import settings_bp, register_swap_callback
+from settings_routes import settings_bp, register_swap_callback, register_cleanup
+from cleanup import CleanupScheduler
 
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
@@ -85,6 +86,12 @@ register_swap_callback(swap_wlc_client)
 collector = ClientCollector(client, mongo_db, interval=COLLECT_INTERVAL)
 collector.start()
 atexit.register(collector.stop)
+
+# Scheduled tracking-data cleanup (admin-configurable cadence + retention)
+cleanup_scheduler = CleanupScheduler(mongo_db)
+cleanup_scheduler.start()
+atexit.register(cleanup_scheduler.stop)
+register_cleanup(cleanup_scheduler)
 
 # AP floor-map blueprint (routes carry their own @require_auth / @require_role)
 init_map(mongo_db)

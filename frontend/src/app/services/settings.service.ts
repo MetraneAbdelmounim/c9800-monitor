@@ -43,6 +43,19 @@ export interface SetupStatus {
   user_count: number;
 }
 
+export type CleanupSchedule = '5min' | 'hourly' | 'daily' | 'weekly' | 'monthly';
+
+export interface CleanupSettings {
+  enabled: boolean;
+  schedule: CleanupSchedule;
+  retention_days: number;
+  last_run?: string | null;
+  last_run_deleted?: number | null;
+  updated_at?: string | null;
+  updated_by?: string | null;
+  stats?: Record<string, number>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
   private api = '/api/settings';
@@ -75,5 +88,15 @@ export class SettingsService {
 
   getSetupStatus(): Observable<SetupStatus> {
     return this.http.get<SetupStatus>('/api/setup/status');
+  }
+
+  getCleanup(): Observable<CleanupSettings> {
+    return this.http.get<CleanupSettings>(`${this.api}/cleanup`);
+  }
+  saveCleanup(p: { enabled: boolean; schedule: CleanupSchedule; retention_days: number }): Observable<CleanupSettings> {
+    return this.http.put<CleanupSettings>(`${this.api}/cleanup`, p);
+  }
+  runCleanup(): Observable<{ deleted: number; retention_days: number }> {
+    return this.http.post<{ deleted: number; retention_days: number }>(`${this.api}/cleanup/run`, {});
   }
 }

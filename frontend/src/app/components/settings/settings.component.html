@@ -60,6 +60,63 @@
     <div class="msg error" *ngIf="demoError()">{{ demoError() }}</div>
   </section>
 
+  <!-- ── Tracking data cleanup ────────────────────────── -->
+  <section class="card cleanup-card">
+    <div class="mode-head">
+      <div>
+        <h2>Tracking data cleanup</h2>
+        <p class="card-sub">
+          Periodically delete collected client snapshots &amp; roaming history to keep
+          disk usage in check. MongoDB TTL also expires old data as a backstop.
+        </p>
+      </div>
+      <div class="mode-toggle">
+        <label class="switch" [class.disabled]="clSaving()">
+          <input type="checkbox" [(ngModel)]="clEnabled" name="clEnabled" [disabled]="clSaving()" />
+          <span class="track"><span class="thumb"></span></span>
+        </label>
+        <span class="mode-label" [class.on]="clEnabled">{{ clEnabled ? 'Scheduled' : 'Off' }}</span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <label class="field">
+        <span class="field-label">Run cleanup</span>
+        <select [(ngModel)]="clSchedule" name="clSchedule" [disabled]="!clEnabled">
+          <option *ngFor="let o of scheduleOptions" [value]="o.value">{{ o.label }}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Delete records older than (days)</span>
+        <input type="number" min="0" [(ngModel)]="clRetention" name="clRetention" />
+      </label>
+    </div>
+    <p class="card-sub hint">
+      <strong>0 days</strong> = wipe all tracking history on each run. Schedule boundaries are UTC.
+    </p>
+
+    <div class="mode-meta" *ngIf="cleanup() as c">
+      <span class="meta-item">Stored records: <strong>{{ cleanupTotal() | number }}</strong></span>
+      <span class="meta-item" *ngIf="c.last_run">
+        Last run: <strong class="dim">{{ c.last_run }}</strong> · removed {{ c.last_run_deleted }}
+      </span>
+      <span class="meta-item" *ngIf="!c.last_run"><strong class="dim">Never run</strong></span>
+    </div>
+
+    <div class="msg error"   *ngIf="clError()">{{ clError() }}</div>
+    <div class="msg success" *ngIf="clMsg()">{{ clMsg() }}</div>
+
+    <div class="actions">
+      <button type="button" class="btn-secondary" (click)="runCleanupNow()"
+              [disabled]="clRunning() || clSaving()">
+        {{ clRunning() ? 'Cleaning…' : 'Run cleanup now' }}
+      </button>
+      <button type="button" class="btn-primary" (click)="saveCleanup()" [disabled]="clSaving()">
+        {{ clSaving() ? 'Saving…' : 'Save schedule' }}
+      </button>
+    </div>
+  </section>
+
   <div class="error-banner" *ngIf="loadError()">{{ loadError() }}</div>
 
   <div class="layout" *ngIf="current() as c">

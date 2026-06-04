@@ -10,6 +10,7 @@ from settings import (
     get_wlc_settings, save_wlc_settings, public_view,
     get_demo_mode_override, set_demo_mode_override, clear_demo_mode_override,
     get_setup_complete, set_setup_complete,
+    get_cleanup_settings, save_cleanup_settings,
 )
 from restconf_client import C9800RestconfClient
 import config as _config
@@ -19,11 +20,18 @@ settings_bp = Blueprint("settings", __name__, url_prefix="/api/settings")
 # Callback registered by app.py — invoked after a successful save
 # so the running app can swap its live client + collector reference.
 _swap_callback = None
+# CleanupScheduler instance registered by app.py.
+_cleanup = None
 
 
 def register_swap_callback(fn):
     global _swap_callback
     _swap_callback = fn
+
+
+def register_cleanup(scheduler):
+    global _cleanup
+    _cleanup = scheduler
 
 
 @settings_bp.route("/wlc", methods=["GET"])
@@ -153,3 +161,42 @@ def test_wlc():
         "tested_host": host,
         "tested_port": port,
     })
+
+
+# ── Tracking-data cleanup ──────────────────────────────
+def _cleanup_payload():
+    s = get_cleanup_settings()
+    s["stats"] = _cleanup.stats() if _cleanup else {}
+    for k in ("last_run", "updated_at"):
+        if s.get(k) is not None and hasattr(s[k], "isoformat"):
+            s[k] = s[k].isoformat()
+    return s
+
+
+@settings_bp.route("/cleanup", methods=["GET"])
+@require_auth
+def get_cleanup():
+    return jsonify(_cleanup_payload())
+
+
+@settings_bp.route("/cleanup", methods=["PUT"])
+@require_role("admin")
+def update_cleanup():
+    data = request.get_json(silent=True) or {}
+    res = save_cleanup_settings(
+        enabled=bool(data.get("enabled", False)),
+        schedule=(data.get("schedule") or "weekly"),
+        retention_days=data.get("retention_days", 7),
+        updated_by=g.user["username"],
+    )
+    if "error" in res:
+        return jsonify(res), 400
+    return jsonify(_cleanup_payload())
+
+
+@settings_bp.route("/cleanup/run", methods=["POST"])
+@require_role("admin")
+def run_cleanup_now():
+    if not _cleanup:
+        return jsonify({"error": "cleanup scheduler not available"}), 503
+    return jsonify(_cleanup.run_now())

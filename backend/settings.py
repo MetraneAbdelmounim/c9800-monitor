@@ -22,6 +22,13 @@ log = logging.getLogger("Settings")
 _db = None
 _SETTINGS_KEY = "wlc"
 _SYSTEM_KEY = "system"
+_CLEANUP_KEY = "cleanup"
+
+# Collector/tracking collections eligible for scheduled cleanup.
+TRACKING_COLLECTIONS = (
+    "client_snapshots", "client_snapshots_5m", "roaming_events", "ap_load_history",
+)
+CLEANUP_SCHEDULES = ("5min", "hourly", "daily", "weekly", "monthly")
 
 
 def init_settings(mongo_db):
@@ -155,3 +162,67 @@ def set_setup_complete(updated_by: str) -> dict:
     )
     log.info(f"Initial setup marked complete by {updated_by}")
     return {"ok": True}
+
+
+# ── Tracking-data cleanup schedule ─────────────────────
+def get_cleanup_settings() -> dict:
+    base = {
+        "enabled": False, "schedule": "weekly", "retention_days": 7,
+        "last_run": None, "last_run_deleted": None, "last_bucket": None,
+        "updated_at": None, "updated_by": None,
+    }
+    if _db is None:
+        return base
+    doc = _db["settings"].find_one({"_id": _CLEANUP_KEY})
+    if not doc:
+        return base
+    return {
+        "enabled": bool(doc.get("enabled", False)),
+        "schedule": doc.get("schedule", "weekly"),
+        "retention_days": int(doc.get("retention_days", 7)),
+        "last_run": doc.get("last_run"),
+        "last_run_deleted": doc.get("last_run_deleted"),
+        "last_bucket": doc.get("last_bucket"),
+        "updated_at": doc.get("updated_at"),
+        "updated_by": doc.get("updated_by"),
+    }
+
+
+def save_cleanup_settings(enabled: bool, schedule: str,
+                          retention_days, updated_by: str) -> dict:
+    if _db is None:
+        return {"error": "settings DB not initialized"}
+    if schedule not in CLEANUP_SCHEDULES:
+        return {"error": f"schedule must be one of {list(CLEANUP_SCHEDULES)}"}
+    try:
+        rd = max(0, int(retention_days))
+    except (TypeError, ValueError):
+        return {"error": "retention_days must be a number"}
+    _db["settings"].update_one(
+        {"_id": _CLEANUP_KEY},
+        {"$set": {
+            "enabled": bool(enabled), "schedule": schedule, "retention_days": rd,
+            "updated_at": datetime.now(timezone.utc), "updated_by": updated_by,
+        }},
+        upsert=True,
+    )
+    log.info(f"Cleanup settings saved by {updated_by}: "
+             f"enabled={enabled} schedule={schedule} retention={rd}d")
+    return get_cleanup_settings()
+
+
+def record_cleanup_run(deleted: int, bucket: Optional[str] = None) -> None:
+    """Record a completed cleanup. Pass `bucket` only for scheduled runs so a
+    manual run doesn't suppress the next scheduled one."""
+    if _db is None:
+        return
+    upd = {"last_run": datetime.now(timezone.utc), "last_run_deleted": int(deleted)}
+    if bucket is not None:
+        upd["last_bucket"] = bucket
+    _db["settings"].update_one({"_id": _CLEANUP_KEY}, {"$set": upd}, upsert=True)
+
+
+def set_cleanup_bucket(bucket: str) -> None:
+    if _db is None:
+        return
+    _db["settings"].update_one({"_id": _CLEANUP_KEY}, {"$set": {"last_bucket": bucket}}, upsert=True)
