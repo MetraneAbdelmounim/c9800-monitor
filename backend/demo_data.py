@@ -180,6 +180,12 @@ class DemoClient:
         return {"summary": {"critical": 0, "high": 0, "medium": 0, "affected_aps": 0},
                 "conflicts": [], "radios": []}
 
+    def get_rogues(self):
+        return {"rogue_aps": [], "rogue_clients": []}
+
+    def get_awips(self):
+        return {"alarms": []}
+
     def get_interfaces(self):
         return {"interfaces": [
             {"name": "GigabitEthernet0/0/0", "type": "iana-if-type:ethernetCsmacd", "enabled": True, "oper_status": "up"},

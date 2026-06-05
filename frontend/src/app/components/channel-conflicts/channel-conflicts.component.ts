@@ -20,14 +20,41 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
 
   // Severity filter (medium hidden by default — usually low-impact + numerous)
   show: Record<'critical' | 'high' | 'medium', boolean> = { critical: true, high: true, medium: false };
+  // Band tabs + collapsible sections
+  readonly bands = ['2.4 GHz', '5 GHz', '6 GHz'];
+  bandTab: 'all' | string = 'all';
+  collapsed: Record<string, boolean> = {};
 
-  get filtered(): RfConflict[] {
+  private sevFiltered(): RfConflict[] {
     return this.data ? this.data.conflicts.filter(c => this.show[c.severity]) : [];
   }
   sevCount(s: 'critical' | 'high' | 'medium'): number {
     return this.data ? this.data.conflicts.filter(c => c.severity === s).length : 0;
   }
   toggleSev(s: 'critical' | 'high' | 'medium') { this.show[s] = !this.show[s]; }
+
+  setBand(b: string) { this.bandTab = b; }
+  toggleCollapse(b: string) { this.collapsed[b] = !this.collapsed[b]; }
+  bandCount(b: string): number { return this.sevFiltered().filter(c => c.band === b).length; }
+  shownCount(): number {
+    return this.sevFiltered().filter(c => this.bandTab === 'all' || c.band === this.bandTab).length;
+  }
+  /** Bands that currently have ≥1 conflict (after severity filter), respecting the active tab. */
+  get shownBands(): string[] {
+    const f = this.sevFiltered();
+    return this.bands.filter(b => (this.bandTab === 'all' || this.bandTab === b)
+                                  && f.some(c => c.band === b));
+  }
+  conflictsFor(b: string): RfConflict[] { return this.sevFiltered().filter(c => c.band === b); }
+
+  /** Map RSSI (-90..-35 dBm) to a 5–100% bar width. */
+  signalPct(rssi: number): number {
+    return Math.max(5, Math.min(100, Math.round((rssi + 90) / 55 * 100)));
+  }
+  kindLabel(c: RfConflict): string {
+    if (c.type === 'co-channel') return 'Co-channel';
+    return c.band === '2.4 GHz' ? 'Adjacent' : 'Overlapping';
+  }
 
   ngOnInit() {
     this.load();

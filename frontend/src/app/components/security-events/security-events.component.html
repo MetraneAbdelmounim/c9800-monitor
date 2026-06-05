@@ -1,0 +1,63 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Event Log</h1>
+      <p class="subtitle">Security, RF &amp; client anomalies detected from the controller</p>
+    </div>
+    <div class="head-right" *ngIf="data as d">
+      <button class="toggle" [class.on]="showAcked" (click)="toggleShowAcked()">👁 Show Acked</button>
+      <span class="counts">{{ d.unacked }} unacked · {{ d.acked }} acked</span>
+    </div>
+  </div>
+
+  <div class="error-banner" *ngIf="error">{{ error }}</div>
+
+  <app-spinner *ngIf="!data && !error" label="Loading events…"></app-spinner>
+
+  <ng-container *ngIf="data as d">
+    <!-- Action bar -->
+    <div class="action-bar" *ngIf="d.events.length">
+      <label class="sel-all">
+        <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll()" />
+        Selected: <b>{{ selected.size }}</b>
+      </label>
+      <span class="spacer"></span>
+      <button class="btn primary" [disabled]="!selected.size || acking" (click)="ackSelected()">
+        ✓ Acknowledge Selected
+      </button>
+      <button class="btn" [disabled]="acking" (click)="ackAll()">✓ Acknowledge All</button>
+    </div>
+
+    <!-- Empty -->
+    <div class="empty-state" *ngIf="!d.events.length">
+      <div class="empty-icon">✓</div>
+      <div class="empty-title">{{ showAcked ? 'No events' : 'No unacknowledged events' }}</div>
+      <p>Nothing needs attention right now.</p>
+    </div>
+
+    <!-- Event rows -->
+    <div class="event" *ngFor="let e of d.events; trackBy: trackById"
+         [class.acked]="e.acked" [style.borderLeftColor]="sevColor(e.severity)">
+      <input type="checkbox" class="ev-check" [checked]="isSelected(e.id)" (change)="toggleSelect(e.id)" />
+      <span class="ev-icon" [style.background]="sevColor(e.severity) + '22'">
+        <span class="ev-dot" [style.background]="sevColor(e.severity)"></span>
+      </span>
+      <div class="ev-body">
+        <div class="ev-title">{{ e.title }}</div>
+        <div class="ev-detail">{{ e.detail }}</div>
+        <div class="ev-meta">
+          <span class="ev-time">{{ timeAgo(e.last_seen || e.first_seen) }}</span>
+          <span class="ev-tag ap" *ngIf="e.ap_name">{{ e.ap_name }}</span>
+          <span class="ev-tag type" [style.color]="sevColor(e.severity)">{{ catLabel(e) }}</span>
+          <span class="ev-tag resolved" *ngIf="!e.active">resolved</span>
+          <span class="ev-tag ackd" *ngIf="e.acked">acknowledged</span>
+        </div>
+      </div>
+      <div class="ev-right">
+        <span class="ev-sev" [style.color]="sevColor(e.severity)"
+              [style.background]="sevColor(e.severity) + '20'">{{ e.severity | uppercase }}</span>
+        <span class="ev-score">Score {{ e.score }}</span>
+      </div>
+    </div>
+  </ng-container>
+</div>

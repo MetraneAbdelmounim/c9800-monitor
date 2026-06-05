@@ -36,6 +36,10 @@ export class AppComponent implements OnInit, OnDestroy {
     { path: '/system', label: 'System', icon: '⚙' },
   ];
 
+  securityNavItems = [
+    { path: '/events', label: 'Event Log', icon: '⚠' },
+  ];
+
   adminNavItems = [
     { path: '/admin', label: 'Users', icon: '◆' },
     { path: '/settings', label: 'WLC Settings', icon: '⚒' },

@@ -2,7 +2,7 @@
   <div class="page-header">
     <div>
       <h1>Channel Conflicts</h1>
-      <p class="subtitle">Co-channel and adjacent channel interference detection</p>
+      <p class="subtitle">Co-channel &amp; overlapping interference — per radio, from RRM neighbor data</p>
     </div>
     <button class="btn-refresh" (click)="load()" title="Refresh">↻</button>
   </div>
@@ -28,52 +28,63 @@
       <p *ngIf="!d.radios.length">No RRM radio telemetry returned by the controller yet.</p>
     </div>
 
-    <!-- Severity filter -->
-    <div class="filter-bar" *ngIf="d.conflicts.length">
-      <span class="filter-lbl">Show:</span>
-      <button class="filter-chip crit" [class.off]="!show.critical" (click)="toggleSev('critical')"
-              *ngIf="sevCount('critical')">Critical · {{ sevCount('critical') }}</button>
-      <button class="filter-chip high" [class.off]="!show.high" (click)="toggleSev('high')">High · {{ sevCount('high') }}</button>
-      <button class="filter-chip med" [class.off]="!show.medium" (click)="toggleSev('medium')">Medium · {{ sevCount('medium') }}</button>
-      <span class="filter-count">{{ filtered.length }} of {{ d.conflicts.length }} pairs</span>
+    <!-- Toolbar: band tabs + severity chips -->
+    <div class="cc-toolbar" *ngIf="d.conflicts.length">
+      <div class="band-tabs">
+        <button class="band-tab" [class.active]="bandTab === 'all'" (click)="setBand('all')">All</button>
+        <button class="band-tab" *ngFor="let b of bands" [class.active]="bandTab === b"
+                [disabled]="!bandCount(b)" (click)="setBand(b)">
+          {{ b }} <span class="tab-n">{{ bandCount(b) }}</span>
+        </button>
+      </div>
+      <div class="sev-chips">
+        <button class="sev-chip crit" [class.off]="!show.critical" (click)="toggleSev('critical')"
+                *ngIf="sevCount('critical')">Critical {{ sevCount('critical') }}</button>
+        <button class="sev-chip high" [class.off]="!show.high" (click)="toggleSev('high')">High {{ sevCount('high') }}</button>
+        <button class="sev-chip med" [class.off]="!show.medium" (click)="toggleSev('medium')">Medium {{ sevCount('medium') }}</button>
+      </div>
     </div>
 
-    <!-- Conflict cards -->
-    <div class="conflict" *ngFor="let c of filtered; trackBy: trackByConflict"
-         [style.borderLeftColor]="sevColor(c.severity)">
-      <div class="conflict-head">
-        <div class="ch-badge">ch {{ c.channel }}</div>
-        <div class="conflict-title">
-          <div class="title-row">
-            <span class="sev-dot" [style.background]="sevColor(c.severity)"></span>
-            <span class="t-name">{{ c.title }}</span>
-            <span class="sev-pill" [style.color]="sevColor(c.severity)"
-                  [style.background]="sevColor(c.severity) + '22'">{{ c.severity | uppercase }}</span>
-            <span class="ap-pill">{{ c.neighbor_count }} co-channel neighbors</span>
+    <!-- Collapsible band sections -->
+    <div class="band-section" *ngFor="let b of shownBands">
+      <div class="band-head" (click)="toggleCollapse(b)">
+        <span class="caret">{{ collapsed[b] ? '▸' : '▾' }}</span>
+        <span class="band-name">{{ b }}</span>
+        <span class="band-count">{{ conflictsFor(b).length }} conflict{{ conflictsFor(b).length !== 1 ? 's' : '' }}</span>
+      </div>
+
+      <div class="band-body" *ngIf="!collapsed[b]">
+        <div class="cc-card" *ngFor="let c of conflictsFor(b); trackBy: trackByConflict"
+             [style.borderLeftColor]="sevColor(c.severity)">
+          <!-- Focal AP header -->
+          <div class="cc-focal">
+            <span class="cc-dot"></span>
+            <span class="cc-ap">{{ c.focal.ap_name }}</span>
+            <span class="cc-chan">ch {{ c.focal.channel }}<small *ngIf="c.focal.width"> · {{ c.focal.width }}</small></span>
+            <span class="cc-sev" [style.color]="sevColor(c.severity)"
+                  [style.background]="sevColor(c.severity) + '20'">{{ c.severity | uppercase }}</span>
+            <span class="cc-spacer"></span>
+            <span class="cc-stat">util <b [style.color]="utilColor(c.focal.utilization)">{{ c.focal.utilization }}%</b></span>
+            <span class="cc-stat">noise <b [style.color]="noiseColor(c.focal.noise_dbm)">{{ c.focal.noise_dbm }}</b></span>
+            <span class="cc-stat">TX <b>lvl {{ c.focal.tx_level }}</b></span>
           </div>
-          <div class="t-detail">{{ c.detail }}</div>
+          <div class="cc-sub">
+            <span class="kind-pill" [class.co]="c.type === 'co-channel'">{{ kindLabel(c) }}</span>
+            {{ c.neighbor_count }} neighbor{{ c.neighbor_count !== 1 ? 's' : '' }} heard ≥ -80 dBm
+          </div>
+
+          <!-- Interfering neighbors -->
+          <div class="cc-nbrs">
+            <div class="cc-nbr" *ngFor="let n of c.neighbors">
+              <span class="nbr-name">{{ n.ap_name }}</span>
+              <span class="nbr-ch">ch {{ n.channel }}</span>
+              <span class="nbr-bar"><span class="nbr-bar-fill"
+                    [style.width.%]="signalPct(n.rssi)" [style.background]="rssiColor(n.rssi)"></span></span>
+              <span class="nbr-rssi" [style.color]="rssiColor(n.rssi)">{{ n.rssi }} dBm</span>
+              <span class="nbr-util">{{ n.utilization }}%</span>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <!-- Focal AP (the radio whose neighbor list this is) -->
-      <div class="radio-row focal">
-        <span class="r-dot up"></span>
-        <span class="r-name">{{ c.focal.ap_name }}</span>
-        <span class="r-ch">ch {{ c.focal.channel }}</span>
-        <span class="r-tag">this AP</span>
-        <span class="r-metric">Util: <b [style.color]="utilColor(c.focal.utilization)">{{ c.focal.utilization }}%</b></span>
-        <span class="r-metric">Noise: <b [style.color]="noiseColor(c.focal.noise_dbm)">{{ c.focal.noise_dbm }} dBm</b></span>
-        <span class="r-metric">TX: <b>lvl {{ c.focal.tx_level }}<span *ngIf="c.focal.tx_dbm" class="dim"> ({{ c.focal.tx_dbm }} dBm)</span></b></span>
-        <span class="r-metric" *ngIf="c.focal.clients">Clients: <b>{{ c.focal.clients }}</b></span>
-      </div>
-
-      <!-- Direct neighbors heard on the same / overlapping channel -->
-      <div class="radio-row" *ngFor="let n of c.neighbors">
-        <span class="r-dot up"></span>
-        <span class="r-name">{{ n.ap_name }}</span>
-        <span class="r-ch">ch {{ n.channel }}</span>
-        <span class="r-metric">RSSI: <b [style.color]="rssiColor(n.rssi)">{{ n.rssi }} dBm</b></span>
-        <span class="r-metric">Util: <b [style.color]="utilColor(n.utilization)">{{ n.utilization }}%</b></span>
       </div>
     </div>
   </ng-container>

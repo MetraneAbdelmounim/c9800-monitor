@@ -9,6 +9,7 @@ import { ClientTrackingComponent } from './components/client-tracking/client-tra
 import { RoamingGraphComponent } from './components/roaming-graph/roaming-graph.component';
 import { ApMapComponent } from './components/ap-map/ap-map.component';
 import { ChannelConflictsComponent } from './components/channel-conflicts/channel-conflicts.component';
+import { SecurityEventsComponent } from './components/security-events/security-events.component';
 import { LoginComponent } from './components/login/login.component';
 import { AdminComponent } from './components/admin/admin.component';
 import { SettingsComponent } from './components/settings/settings.component';
@@ -28,6 +29,7 @@ export const routes: Routes = [
   { path: 'system', component: SystemInfoComponent, canActivate: [authGuard] },
   { path: 'roaming-graph', component: RoamingGraphComponent, canActivate: [authGuard] },
   { path: 'tracking', component: ClientTrackingComponent, canActivate: [authGuard] },
+  { path: 'events', component: SecurityEventsComponent, canActivate: [authGuard] },
   { path: 'profile', component: ProfileComponent, canActivate: [authGuard] },
   { path: 'admin', component: AdminComponent, canActivate: [adminGuard] },
   { path: 'settings', component: SettingsComponent, canActivate: [adminGuard] },

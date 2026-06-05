@@ -233,3 +233,25 @@ export interface RfAnalysis {
   conflicts: RfConflict[];
   radios: RfRadio[];
 }
+
+// ── Security / Event log ───────────────────────────────
+export interface EventItem {
+  id: string;
+  type: string;
+  category: 'security' | 'rf' | 'client';
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  score: number;
+  title: string;
+  detail: string;
+  ap_name: string;
+  ssid: string;
+  active: boolean;
+  acked: boolean;
+  first_seen?: string;
+  last_seen?: string;
+}
+export interface EventList {
+  events: EventItem[];
+  unacked: number;
+  acked: number;
+}

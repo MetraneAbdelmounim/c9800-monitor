@@ -591,6 +591,7 @@ class C9800RestconfClient:
             cfg = (it.get("phy-ht-cfg") or {}).get("cfg-data", {}) or {}
             r["channel"] = _int(cfg.get("curr-freq"))
             w = _int(cfg.get("chan-width"))
+            r["width_mhz"] = w
             r["width"] = f"{w} MHz" if w else ""
             r["band"] = self._band_label(_first(it, "current-active-band", "radio-type", default=""),
                                          r["slot"], r["channel"])
@@ -636,7 +637,7 @@ class C9800RestconfClient:
                 "ap_name": name_by_mac.get(r["mac"].lower(), r["mac"]),
                 "mac": r["mac"], "slot": r["slot"],
                 "band": r.get("band") or self._band_label("", r["slot"], ch),
-                "channel": ch, "width": r.get("width", ""),
+                "channel": ch, "width": r.get("width", ""), "width_mhz": r.get("width_mhz", 0),
                 "utilization": r.get("util", 0),
                 "noise_dbm": _int(noise) if noise is not None else 0,
                 "interference": 0,
@@ -667,21 +668,30 @@ class C9800RestconfClient:
             if ch <= 0:
                 continue
             band = pub[key]["band"]
-            co_n, adj_n = [], []
+            wa = r.get("width_mhz") or 20
+            co_n, ov_n = [], []
             for (nmac, nslot, rssi) in r.get("nbrs", []):
                 nk = (nmac, nslot)
                 if nk not in radios or rssi < self.NEIGHBOR_RSSI_THRESHOLD:
                     continue
-                nch = radios[nk].get("channel", 0)
+                nr = radios[nk]
+                nch = nr.get("channel", 0)
                 if nch <= 0 or pub[nk]["band"] != band:
                     continue
+                wb = nr.get("width_mhz") or 20
+                # Channel numbers are 5 MHz apart; two radios overlap spectrally
+                # when the centre gap is below the average half-width — this is
+                # what catches 5/6 GHz 40/80/160 MHz bleed onto nearby channels.
+                if 5 * abs(ch - nch) >= (wa + wb) / 2:
+                    continue
                 nb = {"ap_name": pub[nk]["ap_name"], "mac": pub[nk]["mac"],
-                      "slot": pub[nk]["slot"], "channel": nch, "rssi": rssi,
-                      "utilization": pub[nk]["utilization"], "noise_dbm": pub[nk]["noise_dbm"]}
+                      "slot": pub[nk]["slot"], "channel": nch, "width": pub[nk]["width"],
+                      "rssi": rssi, "utilization": pub[nk]["utilization"],
+                      "noise_dbm": pub[nk]["noise_dbm"]}
                 if nch == ch:
                     co_n.append(nb)
-                elif band == "2.4 GHz" and 1 <= abs(nch - ch) <= 4:
-                    adj_n.append(nb)
+                else:
+                    ov_n.append(nb)
 
             focal = pub[key]
             util = focal["utilization"]
@@ -702,23 +712,102 @@ class C9800RestconfClient:
                     "neighbors": co_n,
                 })
 
-            if adj_n:
-                adj_n.sort(key=lambda x: -x["rssi"])
-                strongest, n = adj_n[0]["rssi"], len(adj_n)
-                sev = "high" if (n >= 3 or strongest >= -58 or util >= 40) else "medium"
+            if ov_n:
+                ov_n.sort(key=lambda x: -x["rssi"])
+                strongest, n = ov_n[0]["rssi"], len(ov_n)
+                sev = ("critical" if (util >= 60 or strongest >= -50)
+                       else "high" if (n >= 3 or strongest >= -58 or util >= 40)
+                       else "medium")
+                # 2.4 GHz overlap is "adjacent"; 5/6 GHz overlap is wide-channel bleed
+                label = "Adjacent Channel" if band == "2.4 GHz" else "Overlapping Channel"
                 conflicts.append({
-                    "type": "adjacent", "band": "2.4 GHz", "channel": ch, "severity": sev,
+                    "type": "overlapping", "band": band, "channel": ch, "severity": sev,
                     "ap_count": n + 1, "neighbor_count": n, "rssi": strongest,
-                    "title": "Adjacent Channel · 2.4 GHz", "focal": focal,
-                    "detail": f"{focal['ap_name']} (ch {ch}) overlaps {n} adjacent-channel "
-                              f"neighbor{'s' if n != 1 else ''}; strongest at {strongest} dBm.",
-                    "neighbors": adj_n,
+                    "title": f"{label} · {band}", "focal": focal,
+                    "detail": f"{focal['ap_name']} (ch {ch} @ {focal['width']}) overlaps {n} "
+                              f"neighbor{'s' if n != 1 else ''} on nearby channels; "
+                              f"strongest at {strongest} dBm.",
+                    "neighbors": ov_n,
                 })
 
         order = {"critical": 0, "high": 1, "medium": 2}
         conflicts.sort(key=lambda c: (order.get(c["severity"], 9),
                                       -c["neighbor_count"], -c["rssi"]))
         return conflicts
+
+    # ── Security: rogue APs / clients + aWIPS ──────────
+    def get_rogues(self):
+        """Detected rogue APs and rogue clients from rogue-oper-data.
+        Defensive parsing — field names vary by IOS-XE train; validate live."""
+        d = self._get("Cisco-IOS-XE-wireless-rogue-oper:rogue-oper-data/rogue-data", cache=False)
+        rogue_aps = []
+        for it in _to_list(d.get("Cisco-IOS-XE-wireless-rogue-oper:rogue-data", [])):
+            mac = _str(_first(it, "rogue-address", "rogue-mac", "mac-address"))
+            if not mac:
+                continue
+            cls = _str(_first(it, "rogue-class-type", "class-type", "classification", default="")).lower()
+            state = _str(_first(it, "rogue-mode", "rogue-state", "class-state", default="")).lower()
+            # Per-detecting-radio details — keep the strongest detector
+            ssid, channel, rssi, det = "", 0, -128, ""
+            radios = _to_list(_first(it, "rogue-radio-list", "rogue-ap-radio",
+                                     "rogue-radio", "rogue-ap-detail", default=[]))
+            for rd in radios:
+                rr = _int(_first(rd, "rssi", "rogue-rssi", "max-rssi", default=-128))
+                if rr >= rssi:
+                    rssi = rr
+                    ssid = _str(_first(rd, "ssid", "rogue-ssid", default="")) or ssid
+                    channel = _int(_first(rd, "channel", "rogue-channel", default=0)) or channel
+                    det = _str(_first(rd, "reporting-ap-mac", "detecting-ap-mac", "ap-mac", default=""))
+            ssid = ssid or _str(_first(it, "rogue-ssid", "ssid", default=""))
+            channel = channel or _int(_first(it, "channel", "rogue-channel", default=0))
+            if rssi == -128:
+                rssi = _int(_first(it, "rssi", "max-rssi", default=0))
+            rogue_aps.append({
+                "mac": mac,
+                "classification": ("malicious" if "malicious" in cls
+                                   else "friendly" if "friendly" in cls
+                                   else "custom" if "custom" in cls
+                                   else "unclassified"),
+                "state": state,
+                "ssid": ssid,
+                "channel": channel,
+                "rssi": rssi,
+                "num_clients": _int(_first(it, "rogue-client-count", "num-clients",
+                                           "client-count", default=0)),
+                "on_wire": bool(_first(it, "rldp-status", "on-wire", "found-on-wired-network", default=False)),
+                "detecting_ap": det,
+                "last_heard": _str(_first(it, "last-heard", "last-seen-time", default="")),
+            })
+
+        dc = self._get("Cisco-IOS-XE-wireless-rogue-oper:rogue-oper-data/rogue-client-data", cache=False)
+        rogue_clients = []
+        for it in _to_list(dc.get("Cisco-IOS-XE-wireless-rogue-oper:rogue-client-data", [])):
+            mac = _str(_first(it, "rogue-client-address", "rogue-address", "mac-address"))
+            if not mac:
+                continue
+            rogue_clients.append({
+                "mac": mac,
+                "state": _str(_first(it, "rogue-client-state", "state", default="")).lower(),
+                "rssi": _int(_first(it, "rssi", "max-rssi", default=0)),
+                "rogue_ap": _str(_first(it, "rogue-address", "ap-mac", default="")),
+                "ip": _str(_first(it, "rogue-client-ipaddr", "ip-address", default="")),
+            })
+        return {"rogue_aps": rogue_aps, "rogue_clients": rogue_clients}
+
+    def get_awips(self):
+        """aWIPS intrusion alarms (only present if aWIPS is enabled). Defensive."""
+        d = self._get("Cisco-IOS-XE-wireless-awips-oper:awips-oper-data", cache=False)
+        root = d.get("Cisco-IOS-XE-wireless-awips-oper:awips-oper-data", {}) if isinstance(d, dict) else {}
+        alarms = []
+        for it in _to_list(_first(root, "awips-per-signature-stats", "awips-dot11-frame-pkt-drop-stats",
+                                  "awips-alarm", default=[])):
+            alarms.append({
+                "signature": _str(_first(it, "signature-string", "sign-name", "signature", default="alarm")),
+                "ap_mac": _str(_first(it, "ap-mac", "wtp-mac", default="")),
+                "count": _int(_first(it, "alarm-count", "count", "frame-count", default=0)),
+                "last_seen": _str(_first(it, "last-alarm-time", "timestamp", default="")),
+            })
+        return {"alarms": alarms}
 
     def get_interfaces(self):
         d = self._get(_PATHS["interfaces"])

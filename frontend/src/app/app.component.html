@@ -20,6 +20,15 @@
         <span>{{ item.label }}</span>
       </a>
 
+      <div class="nav-section">SECURITY</div>
+      <a *ngFor="let item of securityNavItems"
+         [routerLink]="item.path"
+         routerLinkActive="active"
+         class="nav-item">
+        <span class="nav-icon">{{ item.icon }}</span>
+        <span>{{ item.label }}</span>
+      </a>
+
       <ng-container *ngIf="auth.hasRole('admin')">
         <div class="nav-section">ADMIN</div>
         <a *ngFor="let item of adminNavItems"

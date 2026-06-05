@@ -13,6 +13,8 @@ from restconf_client import C9800RestconfClient
 from client_collector import ClientCollector
 from tracking_routes import tracking_bp, init_tracking
 from map_routes import map_bp, init_map
+from event_routes import events_bp, register_engine
+from events import EventEngine
 from auth import init_auth, bootstrap_admin, require_auth
 from auth_routes import auth_bp
 from settings import init_settings, get_wlc_settings, get_demo_mode_override, get_setup_complete
@@ -71,13 +73,19 @@ def _build_client():
 client = _build_client()
 
 
+collector = None
+event_engine = None
+
+
 def swap_wlc_client():
-    """Re-instantiate the live client (demo or real) and rewire the collector."""
+    """Re-instantiate the live client (demo or real) and rewire dependents."""
     global client
     new_c = _build_client()
     client = new_c
     if collector is not None:
         collector.rc = new_c
+    if event_engine is not None:
+        event_engine.rc = new_c
 
 
 register_swap_callback(swap_wlc_client)
@@ -92,6 +100,13 @@ cleanup_scheduler = CleanupScheduler(mongo_db)
 cleanup_scheduler.start()
 atexit.register(cleanup_scheduler.stop)
 register_cleanup(cleanup_scheduler)
+
+# Event engine: polls rogue/aWIPS/RF/client sources → persisted event log
+event_engine = EventEngine(client, mongo_db, interval=60)
+event_engine.start()
+atexit.register(event_engine.stop)
+register_engine(event_engine)
+app.register_blueprint(events_bp)
 
 # AP floor-map blueprint (routes carry their own @require_auth / @require_role)
 init_map(mongo_db)
