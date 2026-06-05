@@ -98,7 +98,8 @@
     <div class="mode-meta" *ngIf="cleanup() as c">
       <span class="meta-item">Stored records: <strong>{{ cleanupTotal() | number }}</strong></span>
       <span class="meta-item" *ngIf="c.last_run">
-        Last run: <strong class="dim">{{ c.last_run }}</strong> · removed {{ c.last_run_deleted }}
+        Last run: <strong class="dim">{{ c.last_run | date:'MMM d, y · HH:mm' }}</strong>
+        · removed {{ c.last_run_deleted | number }}
       </span>
       <span class="meta-item" *ngIf="!c.last_run"><strong class="dim">Never run</strong></span>
     </div>
