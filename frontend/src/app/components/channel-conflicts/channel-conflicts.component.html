@@ -52,15 +52,16 @@
         <span class="spec-sub">channel occupancy &amp; conflicts — bar width = channel width, height = # APs</span>
       </div>
       <svg class="spectrum" [attr.viewBox]="'0 0 ' + SPEC_W + ' ' + SPEC_H">
-        <line [attr.x1]="0" [attr.x2]="SPEC_W" [attr.y1]="SPEC_H - 26" [attr.y2]="SPEC_H - 26" class="spec-axis" />
+        <line [attr.x1]="0" [attr.x2]="SPEC_W" [attr.y1]="baseY" [attr.y2]="baseY" class="spec-axis" />
         <g *ngFor="let b of sb.bars" class="spec-g" (click)="onBarClick(sb.band, b.channel)">
           <rect [attr.x]="b.x" [attr.y]="b.y" [attr.width]="b.w" [attr.height]="b.h"
                 [attr.fill]="b.color" [attr.fill-opacity]="isBarActive(sb.band, b.channel) ? 1 : 0.72"
                 [class.active]="isBarActive(sb.band, b.channel)" rx="2" class="spec-bar">
-            <title>ch {{ b.channel }} · {{ b.count }} APs · {{ b.conflicts }} conflict(s)</title>
+            <title>ch {{ b.channel }} ({{ b.width }} MHz) · {{ b.count }} APs · {{ b.conflicts }} conflict(s)</title>
           </rect>
           <text [attr.x]="b.x + b.w / 2" [attr.y]="b.y - 4" class="spec-count">{{ b.count }}</text>
-          <text [attr.x]="b.x + b.w / 2" [attr.y]="SPEC_H - 9" class="spec-chan">{{ b.channel }}</text>
+          <text [attr.x]="b.x + b.w / 2" [attr.y]="baseY + 17" class="spec-chan">ch {{ b.channel }}</text>
+          <text [attr.x]="b.x + b.w / 2" [attr.y]="baseY + 33" class="spec-w">{{ b.width }} MHz</text>
         </g>
       </svg>
       <div class="spec-legend">

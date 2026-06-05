@@ -5,7 +5,7 @@ import { RfAnalysis, RfConflict, RfRadio } from '../../models/models';
 import { SpinnerComponent } from '../spinner/spinner.component';
 
 interface SpecBar {
-  channel: number; x: number; w: number; y: number; h: number;
+  channel: number; width: number; x: number; w: number; y: number; h: number;
   color: string; count: number; conflicts: number; severity: string; util: number;
 }
 interface SpecBand { band: string; bars: SpecBar[]; maxCount: number; }
@@ -47,9 +47,10 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
 
   // ── Spectrum analyzer geometry ───────────────────────
   readonly SPEC_W = 1000;
-  readonly SPEC_H = 130;
+  readonly SPEC_H = 145;
   private readonly PAD = 24;
-  private readonly AXIS = 26;
+  private readonly AXIS = 46;     // space below baseline for channel + width labels
+  get baseY(): number { return this.SPEC_H - this.AXIS; }
 
   get shownSpectrum(): SpecBand[] {
     return this.bandTab === 'all' ? this.spectrum : this.spectrum.filter(s => s.band === this.bandTab);
@@ -81,27 +82,27 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
         if (!cur || rank[c.severity] < rank[cur]) sevByCh.set(ch, c.severity);
       }
 
-      const chans = [...byCh.keys()];
-      const dmin = Math.min(...chans), dmax = Math.max(...chans);
-      const span = Math.max(1, dmax - dmin);
+      // Evenly-spaced categorical bars (one per occupied channel) — bounded
+      // width so they stay readable whether the band has 3 or 25 channels.
+      const entries = [...byCh.entries()].sort((a, b) => a[0] - b[0]);
+      const n = entries.length;
       const innerW = this.SPEC_W - 2 * this.PAD;
       const innerH = this.SPEC_H - this.AXIS;
-      const maxCount = Math.max(...[...byCh.values()].map(e => e.count));
-      const scaleX = (ch: number) => this.PAD + ((ch - dmin) / span) * innerW;
+      const maxCount = Math.max(...entries.map(([, e]) => e.count));
+      const slotW = innerW / n;
+      const barW = Math.min(46, slotW * 0.62);
 
-      const bars: SpecBar[] = [...byCh.entries()].map(([ch, e]) => {
-        const halfCh = (e.width / 5) / 2;             // footprint half-width in channel-numbers
-        const x0 = scaleX(ch - halfCh), x1 = scaleX(ch + halfCh);
-        const w = Math.max(7, x1 - x0);
-        const h = Math.max(4, (e.count / maxCount) * (innerH - 6));
+      const bars: SpecBar[] = entries.map(([ch, e], i) => {
+        const cx = this.PAD + slotW * i + slotW / 2;
+        const h = Math.max(4, (e.count / maxCount) * (innerH - 16));   // headroom for label
         const sev = sevByCh.get(ch);
         return {
-          channel: ch, x: x0, w, y: innerH - h, h,
+          channel: ch, width: e.width, x: cx - barW / 2, w: barW, y: innerH - h, h,
           color: this.sevColor(sev || 'none'),
           count: e.count, conflicts: cntByCh.get(ch) || 0,
           severity: sev || 'none', util: e.util,
         };
-      }).sort((a, b) => a.channel - b.channel);
+      });
 
       out.push({ band, bars, maxCount });
     }
