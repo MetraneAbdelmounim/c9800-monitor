@@ -180,6 +180,9 @@ class DemoClient:
         return {"summary": {"critical": 0, "high": 0, "medium": 0, "affected_aps": 0},
                 "conflicts": [], "radios": []}
 
+    def get_ap_addresses(self):
+        return []
+
     def get_rogues(self):
         return {"rogue_aps": [], "rogue_clients": []}
 

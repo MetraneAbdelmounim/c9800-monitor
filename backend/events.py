@@ -68,7 +68,7 @@ class EventEngine:
     # ── evaluation ─────────────────────────────────────
     def evaluate(self):
         current = []
-        for collector in (self._rogues, self._awips, self._rf, self._client_snr):
+        for collector in (self._rogues, self._dup_addr, self._awips, self._rf, self._client_snr):
             try:
                 current.extend(collector())
             except Exception as e:
@@ -133,6 +133,40 @@ class EventEngine:
                 "detail": f"Client {c['mac']} ({c.get('rssi', 0)} dBm) associated to rogue "
                           f"{c.get('rogue_ap', '?')}.",
             })
+        return out
+
+    def _dup_addr(self):
+        """Detect APs sharing the same IP or ethernet MAC (misconfig / cloning)."""
+        out = []
+        aps = self.rc.get_ap_addresses()
+        by_ip, by_mac = {}, {}
+        for ap in aps:
+            ip = (ap.get("ip") or "").strip()
+            if ip and ip != "0.0.0.0":
+                by_ip.setdefault(ip, []).append(ap)
+            mac = (ap.get("mac") or "").strip().lower()
+            if mac and mac != "00:00:00:00:00:00":
+                by_mac.setdefault(mac, []).append(ap)
+
+        for ip, grp in by_ip.items():
+            names = sorted({a["name"] for a in grp if a.get("name")})
+            if len(names) > 1:
+                out.append({
+                    "key": f"dup_ip:{ip}", "type": "duplicate_ap_ip", "category": "security",
+                    "severity": "high", "score": 84,
+                    "title": "Duplicate AP IP Address", "ap_name": names[0], "ssid": "",
+                    "detail": f"IP {ip} is shared by {len(names)} APs: {', '.join(names)}.",
+                })
+        for mac, grp in by_mac.items():
+            names = sorted({a["name"] for a in grp if a.get("name")})
+            if len(names) > 1:
+                out.append({
+                    "key": f"dup_mac:{mac}", "type": "duplicate_ap_mac", "category": "security",
+                    "severity": "critical", "score": 93,
+                    "title": "Duplicate AP MAC Address", "ap_name": names[0], "ssid": "",
+                    "detail": f"MAC {mac} is reported by {len(names)} APs: {', '.join(names)} "
+                              f"— possible cloned or spoofed AP.",
+                })
         return out
 
     def _awips(self):

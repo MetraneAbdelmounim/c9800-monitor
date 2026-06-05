@@ -261,6 +261,21 @@ class C9800RestconfClient:
     def get_ap_detail(self, mac):
         return self._get(f"{_PATHS['aps']}={mac}", cache=False)
 
+    def get_ap_addresses(self):
+        """Minimal per-AP identity (name, MACs, IP) for duplicate-address checks.
+        Reuses the cached capwap-data fetch."""
+        d = self._get(_PATHS["aps"])
+        out = []
+        for ap in _to_list(d.get("Cisco-IOS-XE-wireless-access-point-oper:capwap-data", [])):
+            board = ap.get("device-detail", {}).get("static-info", {}).get("board-data", {})
+            out.append({
+                "name": _str(ap.get("name")),
+                "wtp_mac": _str(ap.get("wtp-mac")),
+                "mac": _str(board.get("wtp-enet-mac")),
+                "ip": _str(ap.get("ip-addr") or ap.get("wtp-ip")),
+            })
+        return out
+
     # ── Client Summary ─────────────────────────────────
     def get_client_summary(self):
         d = self._get(_PATHS["client_summary"])
