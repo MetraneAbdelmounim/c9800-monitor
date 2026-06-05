@@ -199,6 +199,7 @@ export interface RfRadio {
   band: string;
   channel: number;
   width: string;
+  width_mhz?: number;
   utilization: number;   // %
   noise_dbm: number;
   interference: number;  // %

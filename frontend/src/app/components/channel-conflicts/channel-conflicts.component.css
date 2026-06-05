@@ -65,6 +65,37 @@
 .sev-chip.med  { background: #E8A838; color: #1A1F2B; }
 .sev-chip.off { background: transparent; color: var(--text-3); border-color: var(--border); }
 
+/* Spectrum analyzer */
+.spectrum-wrap {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px 10px; margin-bottom: 14px;
+}
+.spec-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.spec-band { font-size: 14px; font-weight: 800; color: var(--text-1); }
+.spec-sub { font-size: 11px; color: var(--text-muted); }
+.spectrum { width: 100%; height: auto; display: block; overflow: visible; }
+.spec-axis { stroke: var(--border); stroke-width: 1; }
+.spec-g { cursor: pointer; }
+.spec-bar { transition: fill-opacity 0.12s; }
+.spec-g:hover .spec-bar { fill-opacity: 0.95 !important; }
+.spec-bar.active { stroke: var(--text-1); stroke-width: 2; }
+.spec-count { fill: var(--text-2); font-size: 13px; font-weight: 700; text-anchor: middle; font-family: var(--mono); }
+.spec-chan { fill: var(--text-3); font-size: 12px; text-anchor: middle; font-family: var(--mono); }
+.spec-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 11px; color: var(--text-3); }
+.spec-legend span { display: flex; align-items: center; gap: 5px; }
+.spec-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.spec-hint { margin-left: auto; font-style: italic; color: var(--text-muted); }
+
+/* Channel filter chip */
+.chan-filter {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px;
+  background: var(--brand-10); border: 1px solid var(--brand-20); color: var(--brand-light);
+  border-radius: 8px; padding: 7px 12px; font-size: 12px;
+}
+.chan-filter button {
+  background: none; border: none; color: var(--brand-light); cursor: pointer; font-size: 12px; font-weight: 700;
+}
+
 /* Band sections */
 .band-section { margin-bottom: 18px; }
 .band-head {

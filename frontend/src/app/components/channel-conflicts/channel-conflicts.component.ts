@@ -4,6 +4,12 @@ import { WlcService } from '../../services/wlc.service';
 import { RfAnalysis, RfConflict, RfRadio } from '../../models/models';
 import { SpinnerComponent } from '../spinner/spinner.component';
 
+interface SpecBar {
+  channel: number; x: number; w: number; y: number; h: number;
+  color: string; count: number; conflicts: number; severity: string; util: number;
+}
+interface SpecBand { band: string; bars: SpecBar[]; maxCount: number; }
+
 @Component({
   selector: 'app-channel-conflicts',
   standalone: true,
@@ -33,8 +39,87 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
   }
   toggleSev(s: 'critical' | 'high' | 'medium') { this.show[s] = !this.show[s]; }
 
-  setBand(b: string) { this.bandTab = b; }
+  // Clicking a spectrum bar focuses that channel in the card list
+  channelFilter: { band: string; channel: number } | null = null;
+
+  setBand(b: string) { this.bandTab = b; this.channelFilter = null; }
   toggleCollapse(b: string) { this.collapsed[b] = !this.collapsed[b]; }
+
+  // ── Spectrum analyzer geometry ───────────────────────
+  readonly SPEC_W = 1000;
+  readonly SPEC_H = 130;
+  private readonly PAD = 24;
+  private readonly AXIS = 26;
+
+  get shownSpectrum(): SpecBand[] {
+    return this.bandTab === 'all' ? this.spectrum : this.spectrum.filter(s => s.band === this.bandTab);
+  }
+
+  get spectrum(): SpecBand[] {
+    if (!this.data) return [];
+    const out: SpecBand[] = [];
+    for (const band of this.bands) {
+      const radios = this.data.radios.filter(r => r.band === band && r.channel > 0);
+      if (!radios.length) continue;
+
+      const byCh = new Map<number, { count: number; width: number; util: number }>();
+      for (const r of radios) {
+        const e = byCh.get(r.channel) || { count: 0, width: r.width_mhz || 20, util: 0 };
+        e.count++;
+        e.width = Math.max(e.width, r.width_mhz || 20);
+        e.util = Math.max(e.util, r.utilization);
+        byCh.set(r.channel, e);
+      }
+      // worst severity + conflict count per channel
+      const sevByCh = new Map<number, string>();
+      const cntByCh = new Map<number, number>();
+      const rank: any = { critical: 0, high: 1, medium: 2 };
+      for (const c of this.data.conflicts.filter(c => c.band === band)) {
+        const ch = c.focal.channel;
+        cntByCh.set(ch, (cntByCh.get(ch) || 0) + 1);
+        const cur = sevByCh.get(ch);
+        if (!cur || rank[c.severity] < rank[cur]) sevByCh.set(ch, c.severity);
+      }
+
+      const chans = [...byCh.keys()];
+      const dmin = Math.min(...chans), dmax = Math.max(...chans);
+      const span = Math.max(1, dmax - dmin);
+      const innerW = this.SPEC_W - 2 * this.PAD;
+      const innerH = this.SPEC_H - this.AXIS;
+      const maxCount = Math.max(...[...byCh.values()].map(e => e.count));
+      const scaleX = (ch: number) => this.PAD + ((ch - dmin) / span) * innerW;
+
+      const bars: SpecBar[] = [...byCh.entries()].map(([ch, e]) => {
+        const halfCh = (e.width / 5) / 2;             // footprint half-width in channel-numbers
+        const x0 = scaleX(ch - halfCh), x1 = scaleX(ch + halfCh);
+        const w = Math.max(7, x1 - x0);
+        const h = Math.max(4, (e.count / maxCount) * (innerH - 6));
+        const sev = sevByCh.get(ch);
+        return {
+          channel: ch, x: x0, w, y: innerH - h, h,
+          color: this.sevColor(sev || 'none'),
+          count: e.count, conflicts: cntByCh.get(ch) || 0,
+          severity: sev || 'none', util: e.util,
+        };
+      }).sort((a, b) => a.channel - b.channel);
+
+      out.push({ band, bars, maxCount });
+    }
+    return out;
+  }
+
+  onBarClick(band: string, ch: number) {
+    if (this.channelFilter && this.channelFilter.band === band && this.channelFilter.channel === ch) {
+      this.channelFilter = null;             // toggle off
+    } else {
+      this.channelFilter = { band, channel: ch };
+      this.bandTab = band;
+      this.collapsed[band] = false;
+    }
+  }
+  isBarActive(band: string, ch: number): boolean {
+    return !!this.channelFilter && this.channelFilter.band === band && this.channelFilter.channel === ch;
+  }
   bandCount(b: string): number { return this.sevFiltered().filter(c => c.band === b).length; }
   shownCount(): number {
     return this.sevFiltered().filter(c => this.bandTab === 'all' || c.band === this.bandTab).length;
@@ -45,7 +130,13 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
     return this.bands.filter(b => (this.bandTab === 'all' || this.bandTab === b)
                                   && f.some(c => c.band === b));
   }
-  conflictsFor(b: string): RfConflict[] { return this.sevFiltered().filter(c => c.band === b); }
+  conflictsFor(b: string): RfConflict[] {
+    let list = this.sevFiltered().filter(c => c.band === b);
+    if (this.channelFilter && this.channelFilter.band === b) {
+      list = list.filter(c => c.focal.channel === this.channelFilter!.channel);
+    }
+    return list;
+  }
 
   /** Map RSSI (-90..-35 dBm) to a 5–100% bar width. */
   signalPct(rssi: number): number {
@@ -70,7 +161,8 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
   }
 
   sevColor(sev: string): string {
-    return { critical: '#C8102E', high: '#E07830', medium: '#E8A838' }[sev] || 'var(--text-3)';
+    return ({ critical: '#C8102E', high: '#E07830', medium: '#E8A838',
+              none: '#3E7D5A' } as Record<string, string>)[sev] || 'var(--text-3)';
   }
   utilColor(u: number): string {
     if (u >= 50) return '#C8102E';

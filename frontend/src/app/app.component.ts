@@ -30,10 +30,13 @@ export class AppComponent implements OnInit, OnDestroy {
     { path: '/clients', label: 'Clients', icon: '○' },
     { path: '/client-experience', label: 'Experience', icon: '◈' },
     { path: '/wlans', label: 'WLANs', icon: '◉' },
-    { path: '/rf-conflicts', label: 'Ch. Conflicts', icon: '⚡' },
     { path: '/tracking', label: 'Tracking', icon: '◔' },
     { path: '/roaming-graph', label: 'Roaming Graph', icon: '⬡' },
     { path: '/system', label: 'System', icon: '⚙' },
+  ];
+
+  troubleshootNavItems = [
+    { path: '/rf-conflicts', label: 'Ch. Conflicts', icon: '⚡' },
   ];
 
   securityNavItems = [
