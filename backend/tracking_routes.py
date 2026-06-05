@@ -249,18 +249,27 @@ def roaming_graph():
         if not ap_set:
             return jsonify({"nodes": [], "links": []})
 
-        # Get current client counts per AP from latest snapshots
+        # Current client count per AP: take each client's LATEST snapshot (its
+        # current AP) and count distinct clients — not every snapshot row, which
+        # would multiply by the number of polls in the window.
         now = datetime.now(timezone.utc)
-        snap_since = now - timedelta(minutes=5)
+        snap_since = now - timedelta(minutes=3)
         ap_stats_pipe = [
-            {"$match": {"timestamp": {"$gte": snap_since}, "ap_name": {"$in": list(ap_set)}}},
-            {"$group": {
+            {"$match": {"timestamp": {"$gte": snap_since}}},
+            {"$sort": {"timestamp": -1}},
+            {"$group": {                       # latest snapshot per client
+                "_id": "$mac",
+                "ap_name": {"$first": "$ap_name"},
+                "quality": {"$first": "$quality_score"},
+            }},
+            {"$group": {                       # distinct current clients per AP
                 "_id": "$ap_name",
                 "client_count": {"$sum": 1},
-                "avg_quality": {"$avg": "$quality_score"},
+                "avg_quality": {"$avg": "$quality"},
             }},
         ]
-        ap_stats = {doc["_id"]: doc for doc in _db["client_snapshots"].aggregate(ap_stats_pipe)}
+        ap_stats = {doc["_id"]: doc for doc in
+                    _db["client_snapshots"].aggregate(ap_stats_pipe, allowDiskUse=True)}
 
         # Count roam events per AP (as source or destination)
         ap_roam_counts = {}
