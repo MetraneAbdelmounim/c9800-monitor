@@ -646,7 +646,14 @@ class C9800RestconfClient:
                 "clients": r.get("clients", 0),
             }
 
-        conflicts = self._detect_conflicts(radios, pub)
+        # Neighbor lists reference each radio by its OWN base MAC, which differs
+        # per band (only the 2.4 GHz radio MAC equals wtp-mac). The radios of one
+        # AP share the first 5 MAC octets, so resolve neighbors by (prefix, slot).
+        pub_by_radio = {}
+        for (mac, slot), p in pub.items():
+            pub_by_radio[(mac.rsplit(":", 1)[0], slot)] = p
+
+        conflicts = self._detect_conflicts(radios, pub, pub_by_radio)
         summary = {
             "critical": sum(1 for c in conflicts if c["severity"] == "critical"),
             "high":     sum(1 for c in conflicts if c["severity"] == "high"),
@@ -656,11 +663,11 @@ class C9800RestconfClient:
         return {"summary": summary, "conflicts": conflicts,
                 "radios": sorted(pub.values(), key=lambda r: (r["band"], r["channel"]))}
 
-    def _detect_conflicts(self, radios, pub):
+    def _detect_conflicts(self, radios, pub, pub_by_radio):
         """AP-centric: one conflict per radio that hears co-channel (or
-        overlapping 2.4 GHz) neighbors ≥ NEIGHBOR_RSSI_THRESHOLD. The neighbor
-        list is that radio's OWN direct neighbors (with the RSSI it hears them
-        at) — mirroring the WLC 'Neighboring APs' table, no transitive grouping."""
+        overlapping) neighbors ≥ NEIGHBOR_RSSI_THRESHOLD. The neighbor list is
+        that radio's OWN direct neighbors (with the RSSI it hears them at) —
+        mirroring the WLC 'Neighboring APs' table, no transitive grouping."""
         conflicts = []
 
         for key, r in radios.items():
@@ -669,25 +676,30 @@ class C9800RestconfClient:
                 continue
             band = pub[key]["band"]
             wa = r.get("width_mhz") or 20
+            self_radio = (key[0].rsplit(":", 1)[0], key[1])
             co_n, ov_n = [], []
             for (nmac, nslot, rssi) in r.get("nbrs", []):
-                nk = (nmac, nslot)
-                if nk not in radios or rssi < self.NEIGHBOR_RSSI_THRESHOLD:
+                if rssi < self.NEIGHBOR_RSSI_THRESHOLD:
                     continue
-                nr = radios[nk]
-                nch = nr.get("channel", 0)
-                if nch <= 0 or pub[nk]["band"] != band:
+                nradio = (nmac.rsplit(":", 1)[0], nslot)
+                if nradio == self_radio:
+                    continue                       # never conflict with self
+                np = pub_by_radio.get(nradio)      # resolve by (MAC-prefix, slot)
+                if not np or np["band"] != band:
                     continue
-                wb = nr.get("width_mhz") or 20
+                nch = np.get("channel", 0)
+                if nch <= 0:
+                    continue
+                wb = np.get("width_mhz") or 20
                 # Channel numbers are 5 MHz apart; two radios overlap spectrally
                 # when the centre gap is below the average half-width — this is
                 # what catches 5/6 GHz 40/80/160 MHz bleed onto nearby channels.
                 if 5 * abs(ch - nch) >= (wa + wb) / 2:
                     continue
-                nb = {"ap_name": pub[nk]["ap_name"], "mac": pub[nk]["mac"],
-                      "slot": pub[nk]["slot"], "channel": nch, "width": pub[nk]["width"],
-                      "rssi": rssi, "utilization": pub[nk]["utilization"],
-                      "noise_dbm": pub[nk]["noise_dbm"]}
+                nb = {"ap_name": np["ap_name"], "mac": np["mac"],
+                      "slot": np["slot"], "channel": nch, "width": np["width"],
+                      "rssi": rssi, "utilization": np["utilization"],
+                      "noise_dbm": np["noise_dbm"]}
                 if nch == ch:
                     co_n.append(nb)
                 else:
