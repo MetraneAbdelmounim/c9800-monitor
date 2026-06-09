@@ -21,8 +21,10 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      # Compose-internal overrides win over .env
-      - MONGO_URI=mongodb://${MONGO_USER}:${MONGO_PASS}@mongo:27017/?authSource=admin
+      # Compose-internal overrides win over .env. Credentials are NOT embedded in
+      # the URI — the backend passes MONGO_USER/MONGO_PASS (from .env) to
+      # MongoClient as kwargs, so special chars in the password need no encoding.
+      - MONGO_URI=mongodb://mongo:27017
       - FRONTEND_DIR=/app/frontend
       - FLASK_DEBUG=false
     depends_on:

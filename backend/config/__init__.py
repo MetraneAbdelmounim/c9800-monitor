@@ -54,8 +54,13 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 DEMO_MODE = _bool("DEMO_MODE", False)
 
 # ── MongoDB ────────────────────────────────────────────
+# Credentials are passed to MongoClient as separate kwargs (not embedded in the
+# URI) so passwords with special chars like '@' need no URL-encoding.
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB = os.getenv("MONGO_DB", "c9800_monitor")
+MONGO_USER = os.getenv("MONGO_USER", "")
+MONGO_PASS = os.getenv("MONGO_PASS", "")
+MONGO_AUTH_SOURCE = os.getenv("MONGO_AUTH_SOURCE", "admin")
 COLLECT_INTERVAL = _int("COLLECT_INTERVAL", 30)
 
 # ── JWT Auth ───────────────────────────────────────────

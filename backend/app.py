@@ -55,7 +55,12 @@ app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
 CORS(app, origins=cors_origins())
 
 # ── Persistence + auth/settings stores ─────────────────
-mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+# Pass credentials as kwargs (not in the URI) so special chars like '@' in the
+# password don't need URL-encoding.
+_mongo_kwargs = {"serverSelectionTimeoutMS": 5000}
+if MONGO_USER:
+    _mongo_kwargs.update(username=MONGO_USER, password=MONGO_PASS, authSource=MONGO_AUTH_SOURCE)
+mongo_client = MongoClient(MONGO_URI, **_mongo_kwargs)
 mongo_db = mongo_client[MONGO_DB]
 init_auth(mongo_db)
 bootstrap_admin(BOOTSTRAP_ADMIN_USER, BOOTSTRAP_ADMIN_PASS)
