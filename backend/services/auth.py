@@ -136,8 +136,8 @@ def bootstrap_admin(default_user: str, default_pass: str):
             "created_at": datetime.now(timezone.utc),
         })
         log.warning(
-            f"Bootstrap admin created: user='{default_user}' pass='{default_pass}' "
-            "— must be changed on first login"
+            f"Bootstrap admin created: user='{default_user}' — sign in with the "
+            "BOOTSTRAP_ADMIN_PASS you configured; you'll be forced to change it."
         )
 
 

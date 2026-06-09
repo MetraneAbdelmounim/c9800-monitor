@@ -8,6 +8,7 @@ services/, the vendor-neutral client contract in models/.
 """
 from flask import Flask, request, send_from_directory
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from pymongo import MongoClient
 import logging, atexit, os
 
@@ -26,6 +27,7 @@ from routes.settings_routes import settings_bp, register_swap_callback, register
 from routes.tracking_routes import tracking_bp, init_tracking
 from routes.map_routes import map_bp, init_map
 from routes.event_routes import events_bp, register_engine
+from services.limiter import limiter
 
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
@@ -51,8 +53,13 @@ for _w in security_warnings():
 # SPA itself (static assets + index.html). Left unset in dev (ng serve).
 FRONTEND_DIR = os.getenv("FRONTEND_DIR")
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
+# Behind nginx: trust one proxy hop so request.remote_addr / scheme reflect the
+# real client (needed for correct per-IP rate limiting and X-Forwarded-Proto).
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 # Auth is via Bearer token (not cookies); origins are restrictable via CORS_ORIGINS.
 CORS(app, origins=cors_origins())
+# Per-IP rate limiting (brute-force protection on /api/auth/login).
+limiter.init_app(app)
 
 # ── Persistence + auth/settings stores ─────────────────
 # Pass credentials as kwargs (not in the URI) so special chars like '@' in the

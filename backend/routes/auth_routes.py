@@ -11,11 +11,13 @@ from services.auth import (
     authenticate, create_token, create_user, change_password,
     require_auth, require_role, get_user,
 )
+from services.limiter import limiter
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 
 @auth_bp.route("/login", methods=["POST"])
+@limiter.limit("5 per minute; 30 per hour")
 def login():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()

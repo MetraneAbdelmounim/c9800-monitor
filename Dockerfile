@@ -22,6 +22,10 @@ COPY backend/ ./
 # The Angular "application" builder outputs to dist/<project>/browser
 COPY --from=frontend /app/dist/c9800-monitor/browser /app/frontend
 
+# Run as a non-root user (defense in depth — a compromised worker isn't uid 0).
+RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 5000
 # Single worker: the app keeps in-process state (background collector thread +
 # live RESTCONF client). Threads handle request concurrency.

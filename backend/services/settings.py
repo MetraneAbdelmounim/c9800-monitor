@@ -8,15 +8,16 @@ On startup, app.py reads via get_wlc_settings() which merges both.
 Admins can update via PUT /api/settings/wlc, which writes to Mongo and
 swaps the live RESTCONF client.
 
-Note: the WLC password is stored cleartext in MongoDB because the
-RESTCONF client needs it on every request. Restrict Mongo access
-accordingly. A future improvement would be at-rest encryption.
+The WLC password is encrypted at rest (services.crypto, Fernet) before being
+written to MongoDB and decrypted on read. Legacy cleartext rows are read
+transparently and re-encrypted on the next save.
 """
 import logging
 from datetime import datetime, timezone
 from typing import Optional
 
 import config as _config
+from services.crypto import encrypt_secret, decrypt_secret
 
 log = logging.getLogger("Settings")
 _db = None
@@ -57,7 +58,7 @@ def get_wlc_settings() -> dict:
         "host": doc.get("host", base["host"]),
         "port": int(doc.get("port", base["port"])),
         "username": doc.get("username", base["username"]),
-        "password": doc.get("password", base["password"]),
+        "password": decrypt_secret(doc.get("password", "")) or base["password"],
         "verify_ssl": bool(doc.get("verify_ssl", base["verify_ssl"])),
         "updated_at": doc.get("updated_at"),
         "updated_by": doc.get("updated_by"),
@@ -82,7 +83,7 @@ def save_wlc_settings(host: str, port: int, username: str,
         "host": (host or "").strip(),
         "port": int(port),
         "username": (username or "").strip(),
-        "password": final_pw,
+        "password": encrypt_secret(final_pw),
         "verify_ssl": bool(verify_ssl),
         "updated_at": datetime.now(timezone.utc),
         "updated_by": updated_by,

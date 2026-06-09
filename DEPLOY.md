@@ -45,6 +45,10 @@ The backend enforces the first two automatically (won't boot in production witho
 - [x] **Strong `JWT_SECRET`** (≥ 24 random chars) — enforced.
 - [x] **Non-default `BOOTSTRAP_ADMIN_PASS`** — enforced; you're forced to change it on first login too.
 - [x] **MongoDB authentication** — enabled in compose via `MONGO_USER`/`MONGO_PASS`; Mongo is **not published** externally (only the backend reaches it on the internal network).
+- [x] **WLC password encrypted at rest** — Fernet (`services/crypto.py`); stored as ciphertext, decrypted only in memory.
+- [x] **Login rate-limiting** — 5/min + 30/hr per IP on `/api/auth/login`.
+- [x] **Container runs as non-root** (`appuser`, uid 10001).
+- [x] **Security headers** — HSTS, CSP, X-Frame-Options DENY, nosniff, Referrer-Policy at nginx.
 - [x] **CORS locked** to `CORS_ORIGINS` (set it to your URL).
 - [ ] **TLS cert** — replace the self-signed cert with a CA-signed one for client-facing use (drop `server.crt`/`server.key` into `deploy/nginx/certs/`). `WLC_VERIFY_SSL` stays `false` only if your controller uses a self-signed cert you trust.
 - [ ] **Back up MongoDB** (`mongo_data` volume) — it holds users, settings, floor-plan maps, and history. e.g. `docker compose exec mongo mongodump --username "$MONGO_USER" --password "$MONGO_PASS" --authenticationDatabase admin --archive` .
