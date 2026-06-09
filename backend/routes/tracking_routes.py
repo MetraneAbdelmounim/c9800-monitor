@@ -305,6 +305,47 @@ def roaming_graph():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@tracking_bp.route("/api/tracking/trends")
+def trends():
+    """Capacity/health time-series for the Trends page."""
+    time_range = request.args.get("range", "last24h")
+    since = _parse_range(time_range)
+
+    sys_docs = list(_db["system_metrics"].find(
+        {"timestamp": {"$gte": since}},
+        {"_id": 0, "timestamp": 1, "total_clients": 1, "clients_2g": 1,
+         "clients_5g": 1, "clients_6g": 1, "cpu_5s": 1, "mem_used_pct": 1, "total_aps": 1},
+    ).sort("timestamp", 1))
+    max_points = 300
+    if len(sys_docs) > max_points:
+        step = len(sys_docs) // max_points
+        sys_docs = sys_docs[::step]
+
+    try:
+        top = list(_db["ap_load_history"].aggregate([
+            {"$match": {"timestamp": {"$gte": since}}},
+            {"$group": {"_id": "$ap_name",
+                        "avg_clients": {"$avg": "$client_count"},
+                        "max_clients": {"$max": "$client_count"}}},
+            {"$sort": {"avg_clients": -1}}, {"$limit": 12},
+        ], allowDiskUse=True))
+        top_aps = [{"ap_name": t["_id"], "avg_clients": round(t["avg_clients"], 1),
+                    "max_clients": t["max_clients"]} for t in top if t["_id"]]
+
+        hourly = list(_db["system_metrics"].aggregate([
+            {"$match": {"timestamp": {"$gte": since}}},
+            {"$group": {"_id": {"$hour": "$timestamp"}, "avg_clients": {"$avg": "$total_clients"}}},
+            {"$sort": {"_id": 1}},
+        ]))
+        hourly_data = [{"hour": h["_id"], "avg_clients": round(h["avg_clients"], 1)} for h in hourly]
+    except Exception as e:
+        top_aps, hourly_data = [], []
+        return jsonify({"error": str(e), "system": _serialize(sys_docs),
+                        "top_aps": top_aps, "hourly": hourly_data})
+
+    return jsonify({"range": time_range, "since": since.isoformat(),
+                    "system": _serialize(sys_docs), "top_aps": top_aps, "hourly": hourly_data})
+
 @tracking_bp.route("/api/tracking/status")
 def collector_status():
     try:

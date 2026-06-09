@@ -189,7 +189,7 @@ export class RoamingGraphComponent implements OnInit, OnDestroy, AfterViewInit {
       .attr("id", "arrow").attr("viewBox", "0 -5 10 10")
       .attr("refX", 25).attr("refY", 0).attr("markerWidth", 6).attr("markerHeight", 6)
       .attr("orient", "auto")
-      .append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", "var(--text-muted)");
+      .append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", "#8a93a3");
 
     // Glow filter
     const filter = defs.append("filter").attr("id", "glow");
@@ -221,7 +221,7 @@ export class RoamingGraphComponent implements OnInit, OnDestroy, AfterViewInit {
     const linkLabel = g.append("g").selectAll("text")
       .data(links).enter().append("text")
       .text((d: any) => d.count > 1 ? d.count + "x" : "")
-      .attr("fill", "var(--text-3)").attr("font-size", "9px")
+      .attr("fill", "#aab2bf").attr("font-size", "9px")
       .attr("font-family", "JetBrains Mono, monospace")
       .attr("text-anchor", "middle").attr("dy", -6);
 
@@ -251,14 +251,14 @@ export class RoamingGraphComponent implements OnInit, OnDestroy, AfterViewInit {
     // Node labels
     node.append("text")
       .text((d: any) => this.shortLabel(d.label))
-      .attr("fill", "var(--text-1)").attr("font-size", "10px")
+      .attr("fill", "#ffffff").attr("font-size", "10px")
       .attr("font-family", "JetBrains Mono, monospace").attr("font-weight", "600")
       .attr("text-anchor", "middle").attr("dy", (d: any) => this.nodeRadius(d, maxClients) + 14);
 
     // Client count inside node
     node.append("text")
       .text((d: any) => d.client_count ? d.client_count : "")
-      .attr("fill", "var(--bg-page)").attr("font-size", "11px")
+      .attr("fill", "#ffffff").attr("font-size", "11px")
       .attr("font-family", "JetBrains Mono, monospace").attr("font-weight", "800")
       .attr("text-anchor", "middle").attr("dy", 4);
 

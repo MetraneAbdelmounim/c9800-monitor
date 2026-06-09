@@ -132,8 +132,8 @@ export class ApListComponent implements OnInit {
 
   stateClass(state: string): string {
     const s = (state || '').toLowerCase();
-    if (s.includes('registered') || s.includes('run')) return 'up';
-    if (s.includes('down') || s.includes('disabled')) return 'down';
+    if (s.includes('registered') || s.includes('run') || s.includes('online') || s.includes('connected')) return 'up';
+    if (s.includes('down') || s.includes('disabled') || s.includes('offline') || s.includes('disconnect')) return 'down';
     return 'warn';
   }
 

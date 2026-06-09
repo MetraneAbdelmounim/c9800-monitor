@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from bson.errors import InvalidId
 
-from auth import require_auth, require_role
+from services.auth import require_auth, require_role
 
 map_bp = Blueprint("map", __name__, url_prefix="/api/map")
 _db = None

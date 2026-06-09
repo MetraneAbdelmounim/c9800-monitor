@@ -66,8 +66,8 @@
       <div>
         <h2>Tracking data cleanup</h2>
         <p class="card-sub">
-          Periodically delete collected client snapshots &amp; roaming history to keep
-          disk usage in check. MongoDB TTL also expires old data as a backstop.
+          Periodically delete collected client snapshots, roaming history &amp; the event
+          log to keep disk usage in check. MongoDB TTL also expires old data as a backstop.
         </p>
       </div>
       <div class="mode-toggle">
@@ -125,6 +125,7 @@
     <section class="card current-card">
       <h2>Current configuration</h2>
       <dl class="kv">
+        <dt>Vendor</dt>           <dd><span class="source-pill mongo">{{ (c.vendor || 'cisco') === 'ruckus' ? 'Ruckus SmartZone' : 'Cisco C9800' }}</span></dd>
         <dt>Host</dt>             <dd class="mono">{{ c.host }}</dd>
         <dt>Port</dt>             <dd class="mono">{{ c.port }}</dd>
         <dt>Username</dt>         <dd class="mono">{{ c.username || '—' }}</dd>
@@ -150,12 +151,19 @@
 
       <form class="form" (ngSubmit)="save()">
         <div class="grid">
+          <label class="field span-3">
+            <span class="field-label">Controller vendor</span>
+            <select [(ngModel)]="vendor" name="vendor">
+              <option value="cisco">Cisco Catalyst 9800 (RESTCONF)</option>
+              <option value="ruckus">Ruckus SmartZone / vSZ (REST API)</option>
+            </select>
+          </label>
           <label class="field span-2">
             <span class="field-label">Host / IP</span>
             <input type="text" [(ngModel)]="host" name="host" placeholder="172.16.40.100" />
           </label>
           <label class="field">
-            <span class="field-label">RESTCONF Port</span>
+            <span class="field-label">Port <em>(443 Cisco · 8443 SmartZone)</em></span>
             <input type="number" [(ngModel)]="port" name="port" min="1" max="65535" />
           </label>
 

@@ -16,7 +16,7 @@
       <div class="kpi-card">
         <div class="kpi-label">HOSTNAME</div>
         <div class="kpi-value red">{{ data.system.hostname }}</div>
-        <div class="kpi-sub">IOS-XE {{ data.system.version }}</div>
+        <div class="kpi-sub">v{{ data.system.version }}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">ACCESS POINTS</div>
@@ -65,7 +65,7 @@
               <div class="mem-bar-fill" [style.width.%]="pool.used_percent"
                    [style.background]="gaugeColor(pool.used_percent)"></div>
             </div>
-            <div class="mem-detail">{{ pool.used_mb }} / {{ pool.total_mb }} MB</div>
+            <div class="mem-detail" *ngIf="pool.total_mb">{{ pool.used_mb }} / {{ pool.total_mb }} MB</div>
           </div>
         </div>
       </div>

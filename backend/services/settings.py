@@ -39,6 +39,7 @@ def init_settings(mongo_db):
 def get_wlc_settings() -> dict:
     """Return the effective WLC settings (Mongo overrides config defaults)."""
     base = {
+        "vendor": _config.WLC_VENDOR,
         "host": _config.WLC_HOST,
         "port": _config.WLC_PORT,
         "username": _config.WLC_USERNAME,
@@ -52,6 +53,7 @@ def get_wlc_settings() -> dict:
     if not doc:
         return base
     return {
+        "vendor": (doc.get("vendor") or base["vendor"]).lower(),
         "host": doc.get("host", base["host"]),
         "port": int(doc.get("port", base["port"])),
         "username": doc.get("username", base["username"]),
@@ -65,16 +67,18 @@ def get_wlc_settings() -> dict:
 
 def save_wlc_settings(host: str, port: int, username: str,
                       password: Optional[str], verify_ssl: bool,
-                      updated_by: str) -> dict:
+                      updated_by: str, vendor: Optional[str] = None) -> dict:
     """Persist settings. If password is empty/None, keep the previous one."""
     if _db is None:
         return {"error": "settings DB not initialized"}
 
     current = get_wlc_settings()
     final_pw = password if password else current["password"]
+    final_vendor = (vendor or current.get("vendor") or "cisco").strip().lower()
 
     doc = {
         "_id": _SETTINGS_KEY,
+        "vendor": final_vendor,
         "host": (host or "").strip(),
         "port": int(port),
         "username": (username or "").strip(),
@@ -84,9 +88,9 @@ def save_wlc_settings(host: str, port: int, username: str,
         "updated_by": updated_by,
     }
     _db["settings"].replace_one({"_id": _SETTINGS_KEY}, doc, upsert=True)
-    log.info(f"WLC settings updated by {updated_by} -> {doc['host']}:{doc['port']}")
+    log.info(f"WLC settings updated by {updated_by} -> {final_vendor} {doc['host']}:{doc['port']}")
     return {
-        "host": doc["host"], "port": doc["port"],
+        "vendor": doc["vendor"], "host": doc["host"], "port": doc["port"],
         "username": doc["username"], "verify_ssl": doc["verify_ssl"],
         "updated_at": doc["updated_at"], "updated_by": updated_by,
     }
@@ -226,3 +230,22 @@ def set_cleanup_bucket(bucket: str) -> None:
     if _db is None:
         return
     _db["settings"].update_one({"_id": _CLEANUP_KEY}, {"$set": {"last_bucket": bucket}}, upsert=True)
+
+
+# ── AP firmware-compliance target ──────────────────────
+def get_target_version() -> str:
+    if _db is None:
+        return ""
+    doc = _db["settings"].find_one({"_id": "lifecycle"})
+    return doc.get("target_ap_version", "") if doc else ""
+
+
+def set_target_version(version: str, updated_by: str) -> None:
+    if _db is None:
+        return
+    _db["settings"].update_one(
+        {"_id": "lifecycle"},
+        {"$set": {"target_ap_version": version, "updated_by": updated_by,
+                  "updated_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )

@@ -1,70 +1,90 @@
 """
-C9800 WLC Monitor - Flask Backend
-With MongoDB tracking, background collector, pagination for scale, JWT auth,
-and runtime-mutable WLC settings (admin can hot-swap host/port).
+WLC Monitor — Flask backend (composition root).
+
+Wires together: MongoDB, auth + settings stores, the swappable WLC client
+(demo ↔ cisco ↔ ruckus), the background collector / event engine / cleanup
+scheduler, and the route blueprints (routes/). Business logic lives in
+services/, the vendor-neutral client contract in models/.
 """
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 from pymongo import MongoClient
 import logging, atexit, os
 
 from config import *
-from restconf_client import C9800RestconfClient
-from client_collector import ClientCollector
-from tracking_routes import tracking_bp, init_tracking
-from map_routes import map_bp, init_map
-from event_routes import events_bp, register_engine
-from events import EventEngine
-from auth import init_auth, bootstrap_admin, require_auth
-from auth_routes import auth_bp
-from settings import init_settings, get_wlc_settings, get_demo_mode_override, get_setup_complete
-from settings_routes import settings_bp, register_swap_callback, register_cleanup
-from cleanup import CleanupScheduler
+from services.cisco_client import C9800RestconfClient
+from services.collector import ClientCollector
+from services.events import EventEngine
+from services.cleanup import CleanupScheduler
+from services.auth import init_auth, bootstrap_admin, require_auth
+from services.settings import (
+    init_settings, get_wlc_settings, get_demo_mode_override, get_setup_complete,
+)
+from routes.api_routes import api_bp, init_api
+from routes.auth_routes import auth_bp
+from routes.settings_routes import settings_bp, register_swap_callback, register_cleanup
+from routes.tracking_routes import tracking_bp, init_tracking
+from routes.map_routes import map_bp, init_map
+from routes.event_routes import events_bp, register_engine
 
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
 log = logging.getLogger("WLC-API")
 
-# In Docker, FRONTEND_DIR points at the built Angular bundle so Flask serves
-# the SPA itself (static assets + index.html). Left unset in dev (ng serve).
+# ── Security gate ──────────────────────────────────────
+# Refuse to start in production (FLASK_DEBUG=false) with insecure secrets;
+# in dev, downgrade to warnings so local runs aren't blocked.
+_blockers = production_blockers()
+if _blockers:
+    if FLASK_DEBUG:
+        for p in _blockers:
+            log.warning(f"[dev] INSECURE CONFIG: {p}")
+    else:
+        raise RuntimeError(
+            "Refusing to start in production with insecure configuration:\n  - "
+            + "\n  - ".join(_blockers)
+            + "\nSet these in your environment/.env. (FLASK_DEBUG=true bypasses this for local dev.)")
+for _w in security_warnings():
+    log.warning(f"SECURITY: {_w}")
+
+# In Docker, FRONTEND_DIR points at the built Angular bundle so Flask serves the
+# SPA itself (static assets + index.html). Left unset in dev (ng serve).
 FRONTEND_DIR = os.getenv("FRONTEND_DIR")
 app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path="")
-# Allow all origins (auth is via Bearer token, not cookies, so wildcard is safe).
-CORS(app, origins="*")
+# Auth is via Bearer token (not cookies); origins are restrictable via CORS_ORIGINS.
+CORS(app, origins=cors_origins())
 
-# MongoDB
+# ── Persistence + auth/settings stores ─────────────────
 mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
 mongo_db = mongo_client[MONGO_DB]
-
-# Auth (init users collection + bootstrap default admin)
 init_auth(mongo_db)
 bootstrap_admin(BOOTSTRAP_ADMIN_USER, BOOTSTRAP_ADMIN_PASS)
-
-# Settings (Mongo persistence for runtime-mutable WLC config)
 init_settings(mongo_db)
 
-# RESTCONF Client (built from settings — Mongo overrides config defaults)
-# Demo mode: Mongo override (set via admin UI) wins over env DEMO_MODE.
+# ── Live WLC client (vendor-selectable, demo override wins) ─
 client = None
 collector = None
+event_engine = None
 
 
 def effective_demo_mode() -> bool:
     override = get_demo_mode_override()
-    if override is not None:
-        return override
-    return DEMO_MODE
+    return override if override is not None else DEMO_MODE
 
 
 def _build_real_client():
     s = get_wlc_settings()
-    log.info(f"Connecting to WLC {s['host']}:{s['port']} (source={s.get('source','config')})")
+    vendor = (s.get("vendor") or "cisco").lower()
+    log.info(f"Connecting to {vendor} WLC {s['host']}:{s['port']} (source={s.get('source','config')})")
+    if vendor == "ruckus":
+        from services.ruckus_client import RuckusClient
+        return RuckusClient(s["host"], s["port"], s["username"], s["password"], s["verify_ssl"])
     return C9800RestconfClient(s["host"], s["port"], s["username"], s["password"], s["verify_ssl"])
 
 
 def _build_client():
     if effective_demo_mode():
-        from demo_data import DemoClient
+        from services.demo_client import DemoClient
         log.info("Live client: DemoClient (simulated data)")
         return DemoClient()
     return _build_real_client()
@@ -73,172 +93,65 @@ def _build_client():
 client = _build_client()
 
 
-collector = None
-event_engine = None
-
-
 def swap_wlc_client():
     """Re-instantiate the live client (demo or real) and rewire dependents."""
     global client
-    new_c = _build_client()
-    client = new_c
+    client = _build_client()
     if collector is not None:
-        collector.rc = new_c
+        collector.rc = client
     if event_engine is not None:
-        event_engine.rc = new_c
+        event_engine.rc = client
 
 
 register_swap_callback(swap_wlc_client)
 
-# Background Collector
+# ── Background workers ─────────────────────────────────
+# Start the polling threads in exactly ONE process. Under the Flask debug
+# reloader the script runs twice (watcher parent + serving child); only the
+# child sets WERKZEUG_RUN_MAIN. Starting workers in both would leave a second
+# collector polling the stale (pre-swap) client — e.g. still hitting the old
+# Cisco controller after you switch the vendor to Ruckus. Gunicorn (prod) has
+# no reloader, so workers start normally there.
+_run_workers = (not FLASK_DEBUG) or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+
 collector = ClientCollector(client, mongo_db, interval=COLLECT_INTERVAL)
-collector.start()
-atexit.register(collector.stop)
-
-# Scheduled tracking-data cleanup (admin-configurable cadence + retention)
 cleanup_scheduler = CleanupScheduler(mongo_db)
-cleanup_scheduler.start()
-atexit.register(cleanup_scheduler.stop)
 register_cleanup(cleanup_scheduler)
-
-# Event engine: polls rogue/aWIPS/RF/client sources → persisted event log
 event_engine = EventEngine(client, mongo_db, interval=60)
-event_engine.start()
-atexit.register(event_engine.stop)
 register_engine(event_engine)
-app.register_blueprint(events_bp)
 
-# AP floor-map blueprint (routes carry their own @require_auth / @require_role)
+if _run_workers:
+    collector.start();        atexit.register(collector.stop)
+    cleanup_scheduler.start(); atexit.register(cleanup_scheduler.stop)
+    event_engine.start();      atexit.register(event_engine.stop)
+else:
+    log.info("Reloader parent process — background workers not started (avoids duplicate polling)")
+
+# ── Blueprints ─────────────────────────────────────────
+init_api(lambda: client, mongo_db, effective_demo_mode)
 init_map(mongo_db)
-app.register_blueprint(map_bp)
-
-# Tracking blueprint: protect every route inside with require_auth
 init_tracking(mongo_db)
+
 
 @tracking_bp.before_request
 def _tracking_auth():
-    # Let CORS preflights through untouched: browsers send OPTIONS with no
-    # Authorization header, so enforcing auth here would 401 the preflight and
-    # the real request would never fire. flask_cors answers the OPTIONS itself.
+    # Let CORS preflights through: browsers send OPTIONS without an Authorization
+    # header, so enforcing auth here would 401 the preflight. flask_cors answers it.
     if request.method == "OPTIONS":
         return None
     return require_auth(lambda: None)()
 
-app.register_blueprint(tracking_bp)
+
+app.register_blueprint(api_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(settings_bp)
-
-# ── API Routes ─────────────────────────────────────────
-# /api/health is intentionally public (used by the sidebar status dot).
-@app.route("/api/health")
-def health():
-    return jsonify(client.health_check())
-
-@app.route("/api/dashboard")
-@require_auth
-def dashboard():
-    return jsonify(client.get_dashboard())
-
-@app.route("/api/system")
-@require_auth
-def system_info():
-    return jsonify(client.get_system_info())
-
-@app.route("/api/cpu")
-@require_auth
-def cpu():
-    return jsonify(client.get_cpu_usage())
-
-@app.route("/api/memory")
-@require_auth
-def memory():
-    return jsonify(client.get_memory_usage())
-
-@app.route("/api/aps")
-@require_auth
-def aps():
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 50, type=int)
-    per_page = min(per_page, 200)
-    return jsonify(client.get_ap_summary(page=page, per_page=per_page))
-
-@app.route("/api/aps/count")
-@require_auth
-def ap_count():
-    return jsonify(client.get_ap_count())
-
-@app.route("/api/aps/<path:mac>")
-@require_auth
-def ap_detail(mac):
-    return jsonify(client.get_ap_detail(mac))
-
-@app.route("/api/clients")
-@require_auth
-def clients_summary():
-    return jsonify(client.get_client_summary())
-
-@app.route("/api/clients/detail")
-@require_auth
-def clients_detail():
-    page = request.args.get("page", None, type=int)
-    per_page = request.args.get("per_page", 50, type=int)
-    per_page = min(per_page, 200)
-    return jsonify(client.get_client_details(page=page, per_page=per_page))
-
-@app.route("/api/clients/search")
-@require_auth
-def clients_search():
-    q = request.args.get("q", "")
-    return jsonify(client.search_clients(q))
-
-@app.route("/api/clients/stats")
-@require_auth
-def clients_stats():
-    return jsonify(client.get_client_stats())
-
-@app.route("/api/clients/<mac>")
-@require_auth
-def client_detail(mac):
-    return jsonify(client.get_client_detail(mac))
-
-@app.route("/api/wlans")
-@require_auth
-def wlans():
-    return jsonify(client.get_wlan_list())
-
-@app.route("/api/rf")
-@require_auth
-def rf():
-    return jsonify(client.get_rf_data())
-
-@app.route("/api/rf/analysis")
-@require_auth
-def rf_analysis():
-    return jsonify(client.get_rf_analysis())
-
-@app.route("/api/interfaces")
-@require_auth
-def interfaces():
-    return jsonify(client.get_interfaces())
-
-
-@app.route("/api/setup/status")
-@require_auth
-def setup_status():
-    """First-run signal for the UI:
-       - setup_complete: has an admin saved WLC settings yet?
-       - demo_mode: is the live client currently the simulator?
-       - user_count: how many user accounts exist."""
-    return jsonify({
-        "setup_complete": get_setup_complete(),
-        "demo_mode": effective_demo_mode(),
-        "user_count": mongo_db["users"].estimated_document_count(),
-    })
-
+app.register_blueprint(tracking_bp)
+app.register_blueprint(map_bp)
+app.register_blueprint(events_bp)
 
 # ── Serve built frontend (production / Docker) ─────────
-# With hash routing the SPA only ever requests "/" + static assets, so a single
-# index route plus Flask's static handler is enough — no catch-all needed.
+# Hash routing means the SPA only requests "/" + static assets — index + Flask's
+# static handler is enough, no catch-all.
 if FRONTEND_DIR:
     @app.route("/")
     def _spa_index():

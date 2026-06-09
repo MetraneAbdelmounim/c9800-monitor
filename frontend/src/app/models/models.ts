@@ -233,6 +233,7 @@ export interface RfAnalysis {
   summary: { critical: number; high: number; medium: number; affected_aps: number };
   conflicts: RfConflict[];
   radios: RfRadio[];
+  neighbor_aware?: boolean;   // false = controller can't do neighbor-based conflict detection
 }
 
 // ── Security / Event log ───────────────────────────────
@@ -255,4 +256,20 @@ export interface EventList {
   events: EventItem[];
   unacked: number;
   acked: number;
+}
+
+// ── Network Advisor ────────────────────────────────────
+export interface Recommendation {
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  category: string;
+  title: string;
+  detail: string;
+  action: string;
+  count: number;
+  items: string[];
+}
+export interface AdvisorResult {
+  summary: { critical: number; high: number; medium: number; low: number };
+  recommendations: Recommendation[];
+  generated_at: string;
 }

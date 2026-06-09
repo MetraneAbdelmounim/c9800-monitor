@@ -1,0 +1,83 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>AP Lifecycle &amp; Firmware</h1>
+      <p class="subtitle">Reboot/flap history and firmware-compliance against a target version</p>
+    </div>
+    <button class="btn-refresh" [class.spin]="refreshing" [disabled]="refreshing" (click)="load()" title="Refresh">↻</button>
+  </div>
+
+  <div class="error-banner" *ngIf="error">{{ error }}</div>
+  <app-spinner *ngIf="!data && !error" label="Loading AP lifecycle…"></app-spinner>
+
+  <ng-container *ngIf="data as d">
+    <!-- Firmware compliance -->
+    <section class="card compliance">
+      <div class="comp-head">
+        <h2>Firmware Compliance</h2>
+        <div class="target" *ngIf="isAdmin">
+          <span class="lbl">Target version</span>
+          <input type="text" [(ngModel)]="targetInput" placeholder="e.g. 17.12.3.x" />
+          <button class="btn primary" (click)="saveTarget()" [disabled]="saving">{{ saving ? 'Saving…' : 'Save' }}</button>
+          <span class="saved" *ngIf="savedMsg">{{ savedMsg }}</span>
+        </div>
+        <div class="target ro" *ngIf="!isAdmin && d.target">Target: <b>{{ d.target }}</b></div>
+      </div>
+
+      <div class="comp-body" *ngIf="d.target">
+        <div class="comp-gauge">
+          <div class="gpct" [style.color]="compliancePct() >= 90 ? 'var(--green)' : compliancePct() >= 60 ? '#E8A838' : '#C8102E'">
+            {{ compliancePct() }}%
+          </div>
+          <div class="glbl">compliant</div>
+          <div class="gnums">{{ d.summary.compliant }} / {{ d.summary.total }} APs on {{ d.target }}</div>
+        </div>
+        <div class="comp-bars">
+          <div class="vrow" *ngFor="let v of d.by_version">
+            <span class="vname" [class.target]="isTarget(v.version)">
+              {{ v.version || 'unknown' }} <span class="vtag" *ngIf="isTarget(v.version)">target</span>
+            </span>
+            <span class="vbar"><span class="vfill" [class.ok]="isTarget(v.version)" [style.width.%]="versionPct(v.count)"></span></span>
+            <span class="vcount">{{ v.count }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="comp-empty" *ngIf="!d.target">
+        <p>Set a target AP version to track firmware compliance{{ isAdmin ? ' above' : ' (admin only)' }}.</p>
+        <div class="vdist">
+          <span class="vchip" *ngFor="let v of d.by_version">{{ v.version || 'unknown' }} · {{ v.count }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- AP table -->
+    <section class="card table-card">
+      <h2>Access Points <span class="dim">({{ d.aps.length }})</span></h2>
+      <table>
+        <thead>
+          <tr>
+            <th>AP</th><th>Model</th><th>Version</th><th>State</th>
+            <th class="num">Uptime</th><th class="num">Reboots</th><th class="num">Flaps</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let a of d.aps; trackBy: trackByMac" [class.bad]="!a.compliant">
+            <td class="name">{{ a.name }}</td>
+            <td class="mono dim">{{ a.model || '—' }}</td>
+            <td>
+              <span class="ver" [class.nok]="d.target && !a.compliant">{{ a.sw_version || '—' }}</span>
+              <span class="ver-x" *ngIf="d.target && !a.compliant" title="Not on target version">✕</span>
+            </td>
+            <td><span class="state-pill" [class]="stateClass(a.state)">{{ a.state || '—' }}</span></td>
+            <td class="num mono">{{ uptime(a.uptime_sec) }}</td>
+            <td class="num"><span [class.flag]="a.reboot_count">{{ a.reboot_count }}</span></td>
+            <td class="num"><span [class.flag]="a.flap_count">{{ a.flap_count }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="foot-note">Reboot &amp; flap counts accrue while the collector runs; each is also logged to
+        <strong>Security → Event Log</strong>.</p>
+    </section>
+  </ng-container>
+</div>

@@ -24,8 +24,32 @@ sudo usermod -aG docker "$USER"   # log out/in afterwards
 
 ```bash
 cp .env.example .env
-nano .env          # set JWT_SECRET, BOOTSTRAP_ADMIN_PASS, WLC_* …
+nano .env
 ```
+
+**Required for production** (the backend refuses to start otherwise):
+
+```bash
+# strong JWT secret
+python3 -c "import secrets;print('JWT_SECRET='+secrets.token_urlsafe(48))"
+```
+Then in `.env` set:
+- `JWT_SECRET=` … (the generated value, ≥ 24 chars)
+- `BOOTSTRAP_ADMIN_PASS=` … (strong; not `admin`/`change-me`)
+- `MONGO_USER=` / `MONGO_PASS=` … (Mongo runs with auth; pick a strong pass)
+- `CORS_ORIGINS=https://<your-host>:8443` (the real URL, not `*`)
+- `WLC_HOST/PORT/USERNAME/PASSWORD` and `WLC_VENDOR` (`cisco` or `ruckus`)
+
+## 🔒 Production security checklist
+The backend enforces the first two automatically (won't boot in production without them):
+- [x] **Strong `JWT_SECRET`** (≥ 24 random chars) — enforced.
+- [x] **Non-default `BOOTSTRAP_ADMIN_PASS`** — enforced; you're forced to change it on first login too.
+- [x] **MongoDB authentication** — enabled in compose via `MONGO_USER`/`MONGO_PASS`; Mongo is **not published** externally (only the backend reaches it on the internal network).
+- [x] **CORS locked** to `CORS_ORIGINS` (set it to your URL).
+- [ ] **TLS cert** — replace the self-signed cert with a CA-signed one for client-facing use (drop `server.crt`/`server.key` into `deploy/nginx/certs/`). `WLC_VERIFY_SSL` stays `false` only if your controller uses a self-signed cert you trust.
+- [ ] **Back up MongoDB** (`mongo_data` volume) — it holds users, settings, floor-plan maps, and history. e.g. `docker compose exec mongo mongodump --username "$MONGO_USER" --password "$MONGO_PASS" --authenticationDatabase admin --archive` .
+- [ ] **Validate against the client's actual controllers** — adapter field names can differ across IOS-XE / SmartZone versions.
+- [ ] **Privacy/retention** — the app stores client MACs, hostnames, usernames, IPs. Set the data-retention/cleanup schedule in Settings to match policy.
 
 ## 2. Generate the self-signed certificate
 

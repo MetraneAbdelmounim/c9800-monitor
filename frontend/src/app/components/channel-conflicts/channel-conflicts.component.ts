@@ -22,6 +22,7 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
 
   data: RfAnalysis | null = null;
   error = '';
+  refreshing = false;
   private iv: any;
 
   // Severity filter (medium hidden by default — usually low-impact + numerous)
@@ -96,9 +97,13 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
         const cx = this.PAD + slotW * i + slotW / 2;
         const h = Math.max(4, (e.count / maxCount) * (innerH - 16));   // headroom for label
         const sev = sevByCh.get(ch);
+        // Color by conflict severity if known, else by channel utilization so
+        // busy channels stand out even when conflict detection isn't available.
+        const color = sev ? this.sevColor(sev)
+          : e.util >= 70 ? '#C8102E' : e.util >= 40 ? '#E8A838' : '#3E7D5A';
         return {
           channel: ch, width: e.width, x: cx - barW / 2, w: barW, y: innerH - h, h,
-          color: this.sevColor(sev || 'none'),
+          color,
           count: e.count, conflicts: cntByCh.get(ch) || 0,
           severity: sev || 'none', util: e.util,
         };
@@ -113,8 +118,9 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
     if (this.channelFilter && this.channelFilter.band === band && this.channelFilter.channel === ch) {
       this.channelFilter = null;             // toggle off
     } else {
+      // Focus the channel's cards WITHOUT changing the band tab — keeping the
+      // spectrum (which follows bandTab) showing every band.
       this.channelFilter = { band, channel: ch };
-      this.bandTab = band;
       this.collapsed[band] = false;
     }
   }
@@ -125,11 +131,14 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
   shownCount(): number {
     return this.sevFiltered().filter(c => this.bandTab === 'all' || c.band === this.bandTab).length;
   }
-  /** Bands that currently have ≥1 conflict (after severity filter), respecting the active tab. */
+  /** Bands that currently have ≥1 conflict (after severity filter), respecting
+   *  the active tab and any channel focus. */
   get shownBands(): string[] {
     const f = this.sevFiltered();
-    return this.bands.filter(b => (this.bandTab === 'all' || this.bandTab === b)
-                                  && f.some(c => c.band === b));
+    let bands = this.bands.filter(b => (this.bandTab === 'all' || this.bandTab === b)
+                                       && f.some(c => c.band === b));
+    if (this.channelFilter) bands = bands.filter(b => b === this.channelFilter!.band);
+    return bands;
   }
   conflictsFor(b: string): RfConflict[] {
     let list = this.sevFiltered().filter(c => c.band === b);
@@ -155,9 +164,10 @@ export class ChannelConflictsComponent implements OnInit, OnDestroy {
   ngOnDestroy() { clearInterval(this.iv); }
 
   load() {
+    this.refreshing = true;
     this.wlc.getRfAnalysis().subscribe({
-      next: d => { this.data = d; this.error = ''; },
-      error: e => this.error = e?.error?.error || 'Failed to load RF analysis',
+      next: d => { this.data = d; this.error = ''; this.refreshing = false; },
+      error: e => { this.error = e?.error?.error || 'Failed to load RF analysis'; this.refreshing = false; },
     });
   }
 

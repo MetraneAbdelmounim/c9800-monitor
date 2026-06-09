@@ -68,7 +68,8 @@ class EventEngine:
     # ── evaluation ─────────────────────────────────────
     def evaluate(self):
         current = []
-        for collector in (self._rogues, self._dup_addr, self._awips, self._rf, self._client_snr):
+        for collector in (self._rogues, self._dup_addr, self._lifecycle,
+                          self._awips, self._rf, self._client_snr):
             try:
                 current.extend(collector())
             except Exception as e:
@@ -106,12 +107,21 @@ class EventEngine:
             if cls == "friendly":
                 continue                      # known/allowed — not an alert
             on_wire = r.get("on_wire")
+            rssi = r.get("rssi", 0) or 0
             if cls == "malicious" or on_wire:
                 sev, score = "critical", 98 if on_wire else 95
             elif cls == "custom":
                 sev, score = "high", 85
-            else:                              # unclassified
-                sev, score = "high", 72
+            else:
+                # Unclassified rogues are usually neighbor networks — weight by
+                # how close they are (and whether they have clients) so distant
+                # neighbors don't flood the log with high-severity alerts.
+                if rssi >= -60 or r.get("num_clients", 0) >= 1:
+                    sev, score = "medium", 60
+                elif rssi >= -75:
+                    sev, score = "low", 45
+                else:
+                    sev, score = "low", 30
             title = ("Malicious Rogue AP Detected" if cls == "malicious"
                      else "Rogue AP on Wired Network" if on_wire
                      else f"{cls.capitalize()} Rogue AP Detected")
@@ -166,6 +176,77 @@ class EventEngine:
                     "title": "Duplicate AP MAC Address", "ap_name": names[0], "ssid": "",
                     "detail": f"MAC {mac} is reported by {len(names)} APs: {', '.join(names)} "
                               f"— possible cloned or spoofed AP.",
+                })
+        return out
+
+    def _lifecycle(self):
+        """Detect AP reboots (boot-time reset) and flaps (re-join without reboot)
+        by comparing against the persisted per-AP state, plus a firmware-
+        compliance summary against the admin-set target version."""
+        from services.settings import get_target_version
+        out = []
+        aps = self.rc.get_ap_lifecycle()
+        coll = self.db["ap_lifecycle"]
+        now = datetime.now(timezone.utc)
+
+        for ap in aps:
+            mac = ap.get("mac")
+            if not mac:
+                continue
+            boot, join = ap.get("boot_time", ""), ap.get("join_time", "")
+            name = ap.get("name") or mac
+            state = (ap.get("state") or "").lower()
+
+            # AP offline — active condition (resolves when it comes back online).
+            if any(x in state for x in ("down", "offline", "disconnect")):
+                out.append({
+                    "key": f"ap_down:{mac}", "type": "ap_down", "category": "health",
+                    "severity": "high", "score": 80, "title": f"AP Offline — {name}",
+                    "ap_name": name, "ssid": "",
+                    "detail": f"{name} ({ap.get('model','')}) is {ap.get('state') or 'offline'} — "
+                              f"coverage gap in its area; check PoE/uplink.",
+                })
+
+            prev = coll.find_one({"_id": mac})
+            inc = {}
+            if prev:
+                pboot, pjoin = prev.get("boot_time", ""), prev.get("join_time", "")
+                if boot and pboot and boot != pboot and "1970" not in boot:
+                    inc["reboot_count"] = 1
+                    out.append({
+                        "key": f"reboot:{mac}:{boot}", "type": "ap_reboot", "category": "lifecycle",
+                        "severity": "high", "score": 76, "title": f"AP Rebooted — {name}",
+                        "ap_name": name, "ssid": "",
+                        "detail": f"{name} ({ap.get('model','')}) rebooted — uptime reset.",
+                    })
+                elif join and pjoin and join != pjoin and "1970" not in join:
+                    inc["flap_count"] = 1
+                    flaps = prev.get("flap_count", 0) + 1
+                    sev = "high" if flaps >= 3 else "medium"
+                    out.append({
+                        "key": f"flap:{mac}:{join}", "type": "ap_flap", "category": "lifecycle",
+                        "severity": sev, "score": 70 if sev == "high" else 55,
+                        "title": f"AP Re-joined — {name}", "ap_name": name, "ssid": "",
+                        "detail": f"{name} disconnected and re-joined the controller "
+                                  f"(flap #{flaps}).",
+                    })
+            update = {"$set": {"boot_time": boot, "join_time": join, "name": name,
+                               "version": ap.get("sw_version", ""), "state": ap.get("state", ""),
+                               "last_seen": now}}
+            if inc:
+                update["$inc"] = inc
+            coll.update_one({"_id": mac}, update, upsert=True)
+
+        # Firmware-compliance summary (one rolling event)
+        target = get_target_version()
+        if target and aps:
+            bad = [a for a in aps if a.get("sw_version") and a["sw_version"] != target]
+            if bad:
+                out.append({
+                    "key": "fw_compliance", "type": "firmware_noncompliant", "category": "lifecycle",
+                    "severity": "medium", "score": 50, "title": "AP Firmware Non-Compliant",
+                    "ap_name": "", "ssid": "",
+                    "detail": f"{len(bad)} of {len(aps)} APs are not on target version {target}.",
                 })
         return out
 

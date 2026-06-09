@@ -10,6 +10,9 @@ import { RoamingGraphComponent } from './components/roaming-graph/roaming-graph.
 import { ApMapComponent } from './components/ap-map/ap-map.component';
 import { ChannelConflictsComponent } from './components/channel-conflicts/channel-conflicts.component';
 import { SecurityEventsComponent } from './components/security-events/security-events.component';
+import { TrendsComponent } from './components/trends/trends.component';
+import { ApLifecycleComponent } from './components/ap-lifecycle/ap-lifecycle.component';
+import { AdvisorComponent } from './components/advisor/advisor.component';
 import { LoginComponent } from './components/login/login.component';
 import { AdminComponent } from './components/admin/admin.component';
 import { SettingsComponent } from './components/settings/settings.component';
@@ -26,9 +29,12 @@ export const routes: Routes = [
   { path: 'client-experience', component: ClientExperienceComponent, canActivate: [authGuard] },
   { path: 'wlans', component: WlanListComponent, canActivate: [authGuard] },
   { path: 'rf-conflicts', component: ChannelConflictsComponent, canActivate: [authGuard] },
+  { path: 'lifecycle', component: ApLifecycleComponent, canActivate: [authGuard] },
+  { path: 'advisor', component: AdvisorComponent, canActivate: [authGuard] },
   { path: 'system', component: SystemInfoComponent, canActivate: [authGuard] },
   { path: 'roaming-graph', component: RoamingGraphComponent, canActivate: [authGuard] },
   { path: 'tracking', component: ClientTrackingComponent, canActivate: [authGuard] },
+  { path: 'trends', component: TrendsComponent, canActivate: [authGuard] },
   { path: 'events', component: SecurityEventsComponent, canActivate: [authGuard] },
   { path: 'profile', component: ProfileComponent, canActivate: [authGuard] },
   { path: 'admin', component: AdminComponent, canActivate: [adminGuard] },

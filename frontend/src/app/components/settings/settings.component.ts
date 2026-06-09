@@ -28,6 +28,7 @@ export class SettingsComponent implements OnInit {
   readonly showSetupBanner = signal(false);
 
   // Form state
+  vendor = 'cisco';
   host = '';
   port: number = 443;
   username = '';
@@ -170,6 +171,7 @@ export class SettingsComponent implements OnInit {
     this.svc.getWlc().subscribe({
       next: s => {
         this.current.set(s);
+        this.vendor = s.vendor || 'cisco';
         this.host = s.host;
         this.port = s.port;
         this.username = s.username;
@@ -188,6 +190,7 @@ export class SettingsComponent implements OnInit {
     this.testResult.set(null);
     this.testing.set(true);
     this.svc.testWlc({
+      vendor: this.vendor,
       host: this.host.trim(),
       port: this.port,
       username: this.username.trim(),
@@ -216,6 +219,7 @@ export class SettingsComponent implements OnInit {
     }
     this.saving.set(true);
     this.svc.updateWlc({
+      vendor: this.vendor,
       host: this.host.trim(),
       port: this.port,
       username: this.username.trim(),
@@ -241,6 +245,7 @@ export class SettingsComponent implements OnInit {
     const c = this.current();
     if (!c) return false;
     return (
+      this.vendor !== (c.vendor || 'cisco') ||
       this.host !== c.host ||
       this.port !== c.port ||
       this.username !== c.username ||

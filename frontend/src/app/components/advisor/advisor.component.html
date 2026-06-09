@@ -1,0 +1,59 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Network Advisor</h1>
+      <p class="subtitle">Prioritized recommendations from your live RF, capacity, health &amp; firmware data</p>
+    </div>
+    <button class="btn-refresh" [class.spin]="refreshing" [disabled]="refreshing" (click)="load()" title="Refresh">↻</button>
+  </div>
+
+  <div class="error-banner" *ngIf="error">{{ error }}</div>
+  <app-spinner *ngIf="!data && !error" label="Analyzing network…"></app-spinner>
+
+  <ng-container *ngIf="data as d">
+    <!-- Summary -->
+    <div class="summary">
+      <div class="chip crit"><b>{{ d.summary.critical }}</b> critical</div>
+      <div class="chip high"><b>{{ d.summary.high }}</b> high</div>
+      <div class="chip med"><b>{{ d.summary.medium }}</b> medium</div>
+      <div class="chip low"><b>{{ d.summary.low }}</b> low</div>
+      <span class="gen">analyzed {{ d.generated_at | date:'HH:mm' }}</span>
+    </div>
+
+    <!-- All clear -->
+    <div class="empty" *ngIf="!d.recommendations.length">
+      <div class="ic">✓</div>
+      <div class="t">No recommendations</div>
+      <p>Your network looks healthy across RF, capacity, coverage, health and firmware.</p>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="rec" *ngFor="let r of d.recommendations; trackBy: trackByRec"
+         [style.borderLeftColor]="sevColor(r.severity)">
+      <div class="rec-head">
+        <span class="rec-icon" [style.background]="sevColor(r.severity) + '22'" [style.color]="sevColor(r.severity)">
+          {{ catIcon(r.category) }}
+        </span>
+        <div class="rec-title-wrap">
+          <div class="rec-title-row">
+            <span class="rec-title">{{ r.title }}</span>
+            <span class="sev-pill" [style.color]="sevColor(r.severity)"
+                  [style.background]="sevColor(r.severity) + '20'">{{ r.severity | uppercase }}</span>
+            <span class="cat-pill">{{ r.category }}</span>
+          </div>
+          <div class="rec-detail">{{ r.detail }}</div>
+        </div>
+      </div>
+
+      <div class="rec-action">
+        <span class="action-label">RECOMMENDED</span>
+        <span class="action-text">{{ r.action }}</span>
+      </div>
+
+      <div class="rec-items" *ngIf="r.items.length">
+        <span class="item" *ngFor="let it of r.items">{{ it }}</span>
+        <span class="item more" *ngIf="r.count > r.items.length">+{{ r.count - r.items.length }} more</span>
+      </div>
+    </div>
+  </ng-container>
+</div>

@@ -36,6 +36,10 @@ class ClientCollector:
             ds.create_index([("mac", 1), ("timestamp", -1)])
             ds.create_index("timestamp", expireAfterSeconds=30*86400)
 
+            # System metrics time-series for trends (CPU/mem/clients/APs), 30 days
+            sm = self.db["system_metrics"]
+            sm.create_index("timestamp", expireAfterSeconds=30*86400)
+
             log.info("MongoDB indexes ready (scaled mode)")
         except Exception as e:
             log.error(f"Index setup failed: {e}")
@@ -81,7 +85,9 @@ class ClientCollector:
         snapshots, roams, ap_counts = [], [], {}
         # Store RF-relevant fields + identity fields for search/display
         for c in clients:
-            mac, ap = c.get("mac",""), c.get("ap_name","")
+            # Normalize MAC to lowercase — tracking queries match on lower(),
+            # and vendors differ (Ruckus reports uppercase, Cisco lowercase).
+            mac, ap = (c.get("mac") or "").lower(), c.get("ap_name","")
             if not mac: continue
             snapshots.append({
                 "mac": mac, "timestamp": now,
@@ -136,13 +142,41 @@ class ClientCollector:
         if cycle % 5 == 0 and snapshots:
             self._downsample(now, clients)
 
+        # System metrics time-series (for the Trends page)
+        self._collect_system(now, clients)
+
         log.debug(f"Collected {len(snapshots)} clients, {len(roams)} roams")
+
+    def _collect_system(self, now, clients):
+        """Persist a point-in-time system snapshot for capacity trends."""
+        try:
+            cpu = self.rc.get_cpu_usage()
+            mem = self.rc.get_memory_usage()
+            mem_pct = max((p.get("used_percent", 0) for p in mem.get("pools", [])), default=0)
+            ap_count = self.rc.get_ap_count().get("total_aps", 0)
+            b2 = b5 = b6 = 0
+            for c in clients:
+                band = c.get("band", "")
+                if "6" in band:   b6 += 1
+                elif "5" in band: b5 += 1
+                elif "2" in band: b2 += 1
+            self.db["system_metrics"].insert_one({
+                "timestamp": now,
+                "total_clients": len(clients),
+                "clients_2g": b2, "clients_5g": b5, "clients_6g": b6,
+                "cpu_5s": cpu.get("five_seconds", 0),
+                "cpu_1m": cpu.get("one_minute", 0),
+                "mem_used_pct": round(mem_pct, 1),
+                "total_aps": ap_count,
+            })
+        except Exception as e:
+            log.error(f"system metrics collect failed: {e}")
 
     def _downsample(self, now, clients):
         """Store 5-minute averages for long-term history."""
         ds_docs = []
         for c in clients:
-            mac = c.get("mac","")
+            mac = (c.get("mac") or "").lower()
             if not mac: continue
             ds_docs.append({
                 "mac": mac, "timestamp": now,

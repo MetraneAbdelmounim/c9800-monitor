@@ -178,9 +178,12 @@ class DemoClient:
     def get_rf_analysis(self):
         # No simulated RF telemetry — real RRM data only (live mode).
         return {"summary": {"critical": 0, "high": 0, "medium": 0, "affected_aps": 0},
-                "conflicts": [], "radios": []}
+                "conflicts": [], "neighbor_aware": True, "radios": []}
 
     def get_ap_addresses(self):
+        return []
+
+    def get_ap_lifecycle(self):
         return []
 
     def get_rogues(self):

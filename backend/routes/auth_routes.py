@@ -7,7 +7,7 @@ Auth API Routes:
   GET  /api/auth/users            -> admin-only, list users
 """
 from flask import Blueprint, request, jsonify, g
-from auth import (
+from services.auth import (
     authenticate, create_token, create_user, change_password,
     require_auth, require_role, get_user,
 )
@@ -68,7 +68,7 @@ def register():
 @auth_bp.route("/users", methods=["GET"])
 @require_role("admin")
 def list_users():
-    from auth import _db
+    from services.auth import _db
     users = list(_db["users"].find(
         {}, {"_id": 0, "password_hash": 0}
     ))
@@ -81,7 +81,7 @@ def list_users():
 @auth_bp.route("/users/<username>", methods=["DELETE"])
 @require_role("admin")
 def delete_user(username):
-    from auth import _db
+    from services.auth import _db
     if username == g.user["username"]:
         return jsonify({"error": "you cannot delete your own account"}), 400
     target = _db["users"].find_one({"username": username})

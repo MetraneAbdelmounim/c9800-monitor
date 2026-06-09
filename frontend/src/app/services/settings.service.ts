@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface WlcSettings {
+  vendor?: string;
   host: string;
   port: number;
   username: string;
@@ -14,6 +15,7 @@ export interface WlcSettings {
 }
 
 export interface WlcSettingsPayload {
+  vendor?: string;
   host: string;
   port: number;
   username: string;

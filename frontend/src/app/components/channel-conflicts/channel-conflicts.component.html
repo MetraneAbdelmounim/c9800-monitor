@@ -4,7 +4,7 @@
       <h1>Channel Conflicts</h1>
       <p class="subtitle">Co-channel &amp; overlapping interference — per radio, from RRM neighbor data</p>
     </div>
-    <button class="btn-refresh" (click)="load()" title="Refresh">↻</button>
+    <button class="btn-refresh" [class.spin]="refreshing" [disabled]="refreshing" (click)="load()" title="Refresh">↻</button>
   </div>
 
   <div class="error-banner" *ngIf="error">{{ error }}</div>
@@ -24,8 +24,12 @@
     <div class="empty-state" *ngIf="!d.conflicts.length">
       <div class="empty-icon">✓</div>
       <div class="empty-title">No channel conflicts detected</div>
-      <p *ngIf="d.radios.length">{{ d.radios.length }} radios analyzed — channel plan looks clean.</p>
-      <p *ngIf="!d.radios.length">No RRM radio telemetry returned by the controller yet.</p>
+      <p *ngIf="d.radios.length && d.neighbor_aware !== false">{{ d.radios.length }} radios analyzed — channel plan looks clean.</p>
+      <p *ngIf="d.radios.length && d.neighbor_aware === false">
+        This controller doesn't expose per-radio neighbor data, so neighbor-based conflict
+        detection isn't available — showing channel occupancy &amp; utilization below.
+      </p>
+      <p *ngIf="!d.radios.length">No radio telemetry returned by the controller yet.</p>
     </div>
 
     <!-- Toolbar: band tabs + severity chips -->
@@ -49,7 +53,7 @@
     <div class="spectrum-wrap" *ngFor="let sb of shownSpectrum">
       <div class="spec-head">
         <span class="spec-band">{{ sb.band }}</span>
-        <span class="spec-sub">channel occupancy &amp; conflicts — bar width = channel width, height = # APs</span>
+        <span class="spec-sub">bar width = channel width · height = # APs · color = conflict severity, else utilization</span>
       </div>
       <svg class="spectrum" [attr.viewBox]="'0 0 ' + SPEC_W + ' ' + SPEC_H">
         <line [attr.x1]="0" [attr.x2]="SPEC_W" [attr.y1]="baseY" [attr.y2]="baseY" class="spec-axis" />

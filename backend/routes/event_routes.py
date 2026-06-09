@@ -3,7 +3,7 @@ Event-log API (security + RF + client anomalies). Reads require auth;
 acknowledging requires auth (any signed-in user).
 """
 from flask import Blueprint, request, jsonify, g
-from auth import require_auth
+from services.auth import require_auth
 
 events_bp = Blueprint("events", __name__, url_prefix="/api/events")
 _engine = None

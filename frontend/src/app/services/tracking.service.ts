@@ -94,4 +94,8 @@ export class TrackingService {
     if (mac) url += `&mac=${encodeURIComponent(mac)}`;
     return this.http.get<GraphData>(url);
   }
+
+  getTrends(range: string): Observable<any> {
+    return this.http.get<any>(`${this.api}/trends?range=${range}`);
+  }
 }

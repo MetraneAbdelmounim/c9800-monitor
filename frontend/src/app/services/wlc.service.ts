@@ -36,6 +36,7 @@ export class WlcService {
   getWlans(): Observable<M.WlanList> { return this.http.get<M.WlanList>(this.api + '/wlans'); }
   getRf(): Observable<any> { return this.http.get<any>(this.api + '/rf'); }
   getRfAnalysis(): Observable<M.RfAnalysis> { return this.http.get<M.RfAnalysis>(this.api + '/rf/analysis'); }
+  getAdvisor(): Observable<M.AdvisorResult> { return this.http.get<M.AdvisorResult>(this.api + '/advisor'); }
   getInterfaces(): Observable<M.InterfaceList> { return this.http.get<M.InterfaceList>(this.api + '/interfaces'); }
 }
 

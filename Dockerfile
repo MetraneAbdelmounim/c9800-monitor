@@ -11,6 +11,7 @@ RUN npm run build
 FROM python:3.12-slim AS backend
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app/backend \
     FRONTEND_DIR=/app/frontend
 WORKDIR /app/backend
 

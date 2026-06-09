@@ -5,14 +5,14 @@ WLC settings management (admin-only):
   POST /api/settings/wlc/test   -> test connectivity with proposed config
 """
 from flask import Blueprint, request, jsonify, g
-from auth import require_role, require_auth
-from settings import (
+from services.auth import require_role, require_auth
+from services.settings import (
     get_wlc_settings, save_wlc_settings, public_view,
     get_demo_mode_override, set_demo_mode_override, clear_demo_mode_override,
     get_setup_complete, set_setup_complete,
     get_cleanup_settings, save_cleanup_settings,
 )
-from restconf_client import C9800RestconfClient
+from services.cisco_client import C9800RestconfClient
 import config as _config
 
 settings_bp = Blueprint("settings", __name__, url_prefix="/api/settings")
@@ -61,6 +61,7 @@ def update_wlc():
         password=data.get("password"),
         verify_ssl=bool(data.get("verify_ssl", False)),
         updated_by=g.user["username"],
+        vendor=data.get("vendor"),
     )
     if "error" in saved:
         return jsonify(saved), 500
@@ -144,12 +145,22 @@ def test_wlc():
     if not password:
         password = get_wlc_settings()["password"]
 
-    tester = C9800RestconfClient(
-        host=host, port=port,
-        username=(data.get("username") or "").strip(),
-        password=password,
-        verify_ssl=bool(data.get("verify_ssl", False)),
-    )
+    vendor = (data.get("vendor") or get_wlc_settings().get("vendor") or "cisco").lower()
+    if vendor == "ruckus":
+        from services.ruckus_client import RuckusClient
+        tester = RuckusClient(
+            host=host, port=port,
+            username=(data.get("username") or "").strip(),
+            password=password,
+            verify_ssl=bool(data.get("verify_ssl", False)),
+        )
+    else:
+        tester = C9800RestconfClient(
+            host=host, port=port,
+            username=(data.get("username") or "").strip(),
+            password=password,
+            verify_ssl=bool(data.get("verify_ssl", False)),
+        )
     result = tester.health_check()
     status = result.get("status")
     ok = status == "connected"

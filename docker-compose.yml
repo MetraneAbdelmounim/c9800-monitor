@@ -2,13 +2,19 @@ services:
   mongo:
     image: mongo:7
     restart: unless-stopped
+    # Authentication enabled — credentials come from .env (MONGO_USER/MONGO_PASS).
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:?set MONGO_USER in .env}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASS:?set MONGO_PASS in .env}
     volumes:
       - mongo_data:/data/db
     healthcheck:
+      # ping is allowed pre-auth, so no credentials needed here
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+    # Not published — only the backend (internal network) reaches Mongo.
 
   backend:
     build: .
@@ -16,7 +22,7 @@ services:
     env_file: .env
     environment:
       # Compose-internal overrides win over .env
-      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_URI=mongodb://${MONGO_USER}:${MONGO_PASS}@mongo:27017/?authSource=admin
       - FRONTEND_DIR=/app/frontend
       - FLASK_DEBUG=false
     depends_on:

@@ -261,6 +261,27 @@ class C9800RestconfClient:
     def get_ap_detail(self, mac):
         return self._get(f"{_PATHS['aps']}={mac}", cache=False)
 
+    def get_ap_lifecycle(self):
+        """Per-AP boot/join time, version, state — for reboot/flap detection and
+        firmware-compliance reporting. Reuses the cached capwap-data fetch."""
+        d = self._get(_PATHS["aps"])
+        out = []
+        for ap in _to_list(d.get("Cisco-IOS-XE-wireless-access-point-oper:capwap-data", [])):
+            dev = ap.get("device-detail", {})
+            si = dev.get("static-info", {})
+            ti = ap.get("ap-time-info", {})
+            out.append({
+                "name": _str(ap.get("name")),
+                "mac": _str(ap.get("wtp-mac")),
+                "model": _str(si.get("ap-models", {}).get("model")),
+                "sw_version": _str(dev.get("wtp-version", {}).get("sw-version")),
+                "state": _str(ap.get("ap-state", {}).get("ap-operation-state")),
+                "boot_time": _str(ti.get("boot-time")),
+                "join_time": _str(ti.get("join-time")),
+                "uptime_sec": _elapsed_seconds(ti.get("boot-time")),
+            })
+        return out
+
     def get_ap_addresses(self):
         """Minimal per-AP identity (name, MACs, IP) for duplicate-address checks.
         Reuses the cached capwap-data fetch."""
@@ -675,7 +696,7 @@ class C9800RestconfClient:
             "medium":   sum(1 for c in conflicts if c["severity"] == "medium"),
             "affected_aps": len({c["focal"]["mac"] for c in conflicts}),
         }
-        return {"summary": summary, "conflicts": conflicts,
+        return {"summary": summary, "conflicts": conflicts, "neighbor_aware": True,
                 "radios": sorted(pub.values(), key=lambda r: (r["band"], r["channel"]))}
 
     def _detect_conflicts(self, radios, pub, pub_by_radio):
@@ -772,38 +793,24 @@ class C9800RestconfClient:
             mac = _str(_first(it, "rogue-address", "rogue-mac", "mac-address"))
             if not mac:
                 continue
-            cls = _str(_first(it, "rogue-class-type", "class-type", "classification", default="")).lower()
-            state = _str(_first(it, "rogue-mode", "rogue-state", "class-state", default="")).lower()
-            # Per-detecting-radio details — keep the strongest detector
-            ssid, channel, rssi, det = "", 0, -128, ""
-            radios = _to_list(_first(it, "rogue-radio-list", "rogue-ap-radio",
-                                     "rogue-radio", "rogue-ap-detail", default=[]))
-            for rd in radios:
-                rr = _int(_first(rd, "rssi", "rogue-rssi", "max-rssi", default=-128))
-                if rr >= rssi:
-                    rssi = rr
-                    ssid = _str(_first(rd, "ssid", "rogue-ssid", default="")) or ssid
-                    channel = _int(_first(rd, "channel", "rogue-channel", default=0)) or channel
-                    det = _str(_first(rd, "reporting-ap-mac", "detecting-ap-mac", "ap-mac", default=""))
-            ssid = ssid or _str(_first(it, "rogue-ssid", "ssid", default=""))
-            channel = channel or _int(_first(it, "channel", "rogue-channel", default=0))
-            if rssi == -128:
-                rssi = _int(_first(it, "rssi", "max-rssi", default=0))
+            cls = _str(it.get("rogue-class-type", "")).lower()
+            # Validated on IOS-XE 17.x: strongest-detection details are flat on
+            # the rogue record, suffixed "-max-rssi".
             rogue_aps.append({
                 "mac": mac,
                 "classification": ("malicious" if "malicious" in cls
                                    else "friendly" if "friendly" in cls
                                    else "custom" if "custom" in cls
                                    else "unclassified"),
-                "state": state,
-                "ssid": ssid,
-                "channel": channel,
-                "rssi": rssi,
-                "num_clients": _int(_first(it, "rogue-client-count", "num-clients",
-                                           "client-count", default=0)),
-                "on_wire": bool(_first(it, "rldp-status", "on-wire", "found-on-wired-network", default=False)),
-                "detecting_ap": det,
-                "last_heard": _str(_first(it, "last-heard", "last-seen-time", default="")),
+                "state": _str(it.get("rogue-mode", "")).replace("rogue-state-", ""),
+                "ssid": _str(_first(it, "ssid-max-rssi", "last-heard-ssid", default="")),
+                "channel": _int(_first(it, "channel-max-rssi", "last-channel", default=0)),
+                "rssi": _int(it.get("max-detected-rssi", 0)),
+                "num_clients": _int(_first(it, "n-clients", "rogue-client-count", default=0)),
+                "on_wire": bool(it.get("rogue-is-on-my-network", False)),
+                "detecting_ap": _str(_first(it, "ap-name-max-rssi", "lrad-mac-max-rssi", default="")),
+                "last_heard": _str(_first(it, "rogue-last-timestamp", "last-heard", default="")),
+                "severity_score": _int(it.get("severity-score", 0)),
             })
 
         dc = self._get("Cisco-IOS-XE-wireless-rogue-oper:rogue-oper-data/rogue-client-data", cache=False)

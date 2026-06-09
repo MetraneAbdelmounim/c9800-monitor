@@ -16,13 +16,18 @@ import time
 import logging
 from datetime import datetime, timezone, timedelta
 
-from settings import (
+from services.settings import (
     get_cleanup_settings, record_cleanup_run, set_cleanup_bucket,
     TRACKING_COLLECTIONS,
 )
 
 log = logging.getLogger("Cleanup")
 CHECK_INTERVAL = 60  # seconds between schedule checks
+
+# Collections purged by cleanup, with the timestamp field used for age-based
+# retention. The event log ages on `last_seen`, so active events (recently seen)
+# survive retention-based cleanup while stale/resolved ones are removed.
+PURGE_TARGETS = [(c, "timestamp") for c in TRACKING_COLLECTIONS] + [("events", "last_seen")]
 
 
 def bucket_for(schedule: str, now: datetime) -> str:
@@ -91,11 +96,11 @@ class CleanupScheduler:
                  f"(retention {s['retention_days']}d)")
 
     def _purge(self, retention_days: int, now: datetime) -> int:
-        flt = {}
-        if retention_days > 0:
-            flt = {"timestamp": {"$lt": now - timedelta(days=retention_days)}}
         total = 0
-        for coll in TRACKING_COLLECTIONS:
+        for coll, field in PURGE_TARGETS:
+            flt = {}
+            if retention_days > 0:
+                flt = {field: {"$lt": now - timedelta(days=retention_days)}}
             try:
                 total += self.db[coll].delete_many(flt).deleted_count
             except Exception as e:
@@ -113,7 +118,7 @@ class CleanupScheduler:
 
     def stats(self) -> dict:
         out = {}
-        for coll in TRACKING_COLLECTIONS:
+        for coll, _ in PURGE_TARGETS:
             try:
                 out[coll] = self.db[coll].estimated_document_count()
             except Exception:
