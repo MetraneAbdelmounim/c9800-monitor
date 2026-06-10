@@ -1,0 +1,44 @@
+# ── Scaled deployment: split the web/API tier from a single background worker ──
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --build
+#
+# What changes vs the default single-container deployment:
+#   • backend → WEB / API tier only (RUN_WORKERS=false). No polling threads, so
+#               it can be scaled out without duplicating work.
+#   • worker  → the ONE instance that polls the WLC, evaluates events and runs
+#               cleanup (RUN_WORKERS=true). Keep it at a single replica.
+#
+# Both share MongoDB. Settings edited in the web tier are picked up by the worker
+# automatically (SettingsWatcher), so vendor/host/credential changes propagate
+# without a restart.
+#
+# To scale the WEB tier to several replicas:
+#   docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale backend=3
+#   …and ONLY then also:
+#     1) Let nginx round-robin across replicas — in deploy/nginx/default.conf,
+#        inside the server block, replace the static proxy_pass with:
+#            resolver 127.0.0.11 valid=10s;          # Docker embedded DNS
+#            set $wm_upstream http://backend:5000;
+#            proxy_pass $wm_upstream;                 # variable ⇒ re-resolve each time
+#     2) Share the login rate-limit counter across replicas with Redis:
+#        add a 'redis' service and set on backend:  RATELIMIT_STORAGE=redis://redis:6379
+services:
+  backend:
+    environment:
+      - RUN_WORKERS=false        # web / API only — no background polling
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Internal Mongo (creds come from .env via MONGO_USER/MONGO_PASS kwargs).
+      - MONGO_URI=mongodb://mongo:27017
+      - FLASK_DEBUG=false
+      - RUN_WORKERS=true         # the single polling instance — do NOT scale > 1
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # No published ports — reachable only on the internal network; nginx routes
+    # all user traffic to 'backend', never here.

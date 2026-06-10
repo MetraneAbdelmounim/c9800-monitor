@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>WireMetry — Datasheet</title>
+<style>
+  :root{
+    --navy:#1B3A6B; --navy-d:#13294b; --red:#C8102E;
+    --ink:#222; --muted:#5b6470; --line:#d7dce3; --rowalt:#eef1f5;
+  }
+  *{box-sizing:border-box;}
+  @page{ size:A4; margin:8mm 10mm 8mm 10mm; }
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Segoe UI",Arial,Helvetica,sans-serif;
+    color:var(--ink); font-size:8.6px; line-height:1.42;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+
+  /* ── Header ─────────────────────────────── */
+  .top{ display:flex; justify-content:space-between; align-items:flex-start; }
+  .eyebrow{ font-size:9px; color:var(--muted); }
+  .eyebrow b{ color:var(--ink); }
+  .brand{ display:flex; align-items:center; gap:8px; }
+  .brand .name{ font-size:20px; font-weight:800; letter-spacing:.3px; color:var(--navy); }
+  .brand .name span{ color:var(--red); }
+
+  h1.title{ font-size:26px; font-weight:800; color:var(--ink); margin:9px 0 0; letter-spacing:.2px; }
+  .subtitle{ font-size:10.5px; color:var(--muted); margin-top:2px; }
+
+  .stripe{ height:6px; margin:8px 0 10px; border-radius:2px;
+    background:linear-gradient(90deg,#1B3A6B 0%,#2b5fa8 18%,#7d3fa0 34%,#C8102E 50%,#e0673a 64%,#2aa39a 80%,#3aa856 100%); }
+
+  /* ── Hero / intro grid ───────────────────── */
+  .hero{ display:grid; grid-template-columns:1.15fr .85fr; gap:14px; margin-bottom:2px; }
+  .lead p{ margin:0 0 5px; }
+  .badges{ display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+  .badge{ display:flex; align-items:center; gap:6px; border:1px solid var(--line);
+    border-radius:6px; padding:5px 8px; font-size:8.4px; font-weight:600; color:var(--navy); }
+  .badge svg{ flex:0 0 auto; }
+
+  .highlights{ background:var(--navy); color:#fff; border-radius:8px; padding:10px 12px; }
+  .highlights h3{ margin:0 0 6px; font-size:9.5px; font-weight:700; letter-spacing:1px;
+    text-transform:uppercase; color:#cfe0ff; }
+  .highlights ul{ margin:0; padding:0; list-style:none; }
+  .highlights li{ position:relative; padding-left:15px; margin-bottom:5px; font-size:8.7px; }
+  .highlights li::before{ content:"▸"; position:absolute; left:0; color:var(--red); font-weight:800; }
+
+  /* ── Section bars + flowing columns ──────── */
+  .sections{ column-count:2; column-gap:14px; margin-top:8px; }
+  .block{ break-inside:avoid; margin-bottom:7px; }
+  .secbar{ background:var(--navy); color:#fff; font-size:9px; font-weight:700;
+    letter-spacing:.4px; padding:3px 9px; border-radius:3px; margin-bottom:5px; }
+  h4{ font-size:9px; font-weight:700; color:var(--navy-d); margin:6px 0 2px; }
+  .block p{ margin:0 0 4px; }
+  ul.feat{ margin:0 0 3px; padding-left:14px; }
+  ul.feat li{ margin-bottom:2px; }
+
+  /* ── Tables ──────────────────────────────── */
+  table{ width:100%; border-collapse:collapse; font-size:8.7px; }
+  table.kv td{ padding:3px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.kv tr:nth-child(odd) td{ background:var(--rowalt); }
+  table.kv td.k{ width:42%; color:var(--muted); font-weight:600; }
+  table.kv td.v{ color:var(--ink); }
+
+  table.sizing{ font-size:8.4px; }
+  table.sizing th, table.sizing td{ border:1px solid var(--line); padding:4px 6px; text-align:center; }
+  table.sizing th{ background:var(--navy); color:#fff; font-weight:700; }
+  table.sizing td.profile{ font-weight:700; color:var(--navy-d); background:var(--rowalt); }
+
+  .note{ font-size:8px; color:var(--muted); font-style:italic; margin-top:4px; }
+  .arch{ font-family:"Consolas","Courier New",monospace; font-size:7px; line-height:1.4;
+    background:#f4f6f9; border:1px solid var(--line); border-radius:6px; padding:7px 9px; white-space:pre; color:#2b3b52; }
+
+  /* ── Footer ──────────────────────────────── */
+  .footer{ margin-top:7px; border-top:2px solid var(--navy); padding-top:5px;
+    font-size:7.6px; color:var(--muted); display:flex; justify-content:space-between; }
+  .footer b{ color:var(--navy); }
+</style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="top">
+    <div class="eyebrow">Enterprise Wi-Fi Monitoring — <b>Datasheet</b></div>
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 36 36" aria-hidden="true">
+        <rect width="36" height="36" rx="9" fill="#1B3A6B"/>
+        <g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round">
+          <path d="M9.5 16.5a12 12 0 0 1 17 0"/><path d="M13.5 20.5a6.5 6.5 0 0 1 9 0"/>
+        </g>
+        <circle cx="18" cy="25" r="2.1" fill="#C8102E"/>
+      </svg>
+      <div class="name">Wire<span>Metry</span></div>
+    </div>
+  </div>
+
+  <h1 class="title">WireMetry</h1>
+  <div class="subtitle">Wi-Fi network monitoring &amp; analytics platform — <b>multi-vendor</b></div>
+  <div class="stripe"></div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="lead">
+      <p><b>WireMetry</b> is an on-premise monitoring, troubleshooting and decision-support
+      solution for controller-based (WLC) Wi-Fi infrastructures. It aggregates the live status
+      of access points, clients and the RF environment in real time.</p>
+      <p>Designed to be <b>vendor-agnostic</b>, it supervises <b>Cisco Catalyst 9800</b> and
+      <b>Ruckus SmartZone</b> controllers from a single web interface, detects security and
+      performance anomalies, and delivers concrete optimization recommendations.</p>
+      <div class="badges">
+        <div class="badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" stroke-width="2"><path d="M3 12h18M12 3v18"/></svg>Multi-vendor</div>
+        <div class="badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" stroke-width="2"><path d="M5 13a9 9 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.3" fill="#1B3A6B" stroke="none"/></svg>RF diagnostics</div>
+        <div class="badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" stroke-width="2"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/></svg>Wi-Fi security</div>
+        <div class="badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" stroke-width="2"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-7"/></svg>Trends</div>
+        <div class="badge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1B3A6B" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 12l2 2 4-4"/></svg>On-premise</div>
+      </div>
+    </div>
+    <div class="highlights">
+      <h3>Key points</h3>
+      <ul>
+        <li>Cisco Catalyst 9800 &amp; Ruckus SmartZone, single interface</li>
+        <li>RF diagnostics: channel conflicts, spectrum, airtime, noise</li>
+        <li>Security log: rogues &amp; anomalies, acknowledgeable</li>
+        <li>Network advisor: prioritized recommendations</li>
+        <li>Docker deployment, HTTPS — your data stays on-site</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Flowing two-column body -->
+  <div class="sections">
+
+    <div class="block">
+      <div class="secbar">Real-time monitoring</div>
+      <ul class="feat">
+        <li><b>Dashboard</b>: CPU, memory, interfaces, controller version, AP &amp; client counts, WLAN status.</li>
+        <li><b>Access-point inventory</b>: model, status, version, channel, band, RF load, clients.</li>
+        <li><b>Clients</b>: RSSI, SNR, channel, radio type; search and statistics.</li>
+        <li><b>Controller connectivity</b>: connected / degraded / unreachable.</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Site mapping</div>
+      <p>Import <b>floor plans</b> and place access points, with overlays:</p>
+      <ul class="feat">
+        <li>Live AP status</li>
+        <li>Signal heatmap</li>
+        <li>Roaming paths</li>
+        <li>Coverage / channels</li>
+        <li>Client locator</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <div class="secbar">RF diagnostics</div>
+      <ul class="feat">
+        <li>Channel conflicts: co-channel, adjacent / overlapping interference.</li>
+        <li>Airtime utilization and noise level per radio.</li>
+        <li><b>Spectrum analyzer</b> per band (2.4 / 5 GHz) with channel width.</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Security event log</div>
+      <ul class="feat">
+        <li>Detection: rogue APs, RF events, SNR drops, duplicate addresses, aWIPS alerts, offline APs.</li>
+        <li><b>Persistence</b> in database, <b>acknowledgement</b> and history.</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Decision support</div>
+      <h4>Trends &amp; capacity</h4>
+      <p>Load, clients and RF occupancy over time — saturation forecasting.</p>
+      <h4>Lifecycle &amp; firmware</h4>
+      <p>AP reboot / flap tracking and firmware compliance vs a target version.</p>
+      <h4>Network advisor</h4>
+      <p>Prioritized recommendations: RF conflicts, saturation, offline APs, firmware, weak clients, 2.4 GHz imbalance, controller load.</p>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Tracking &amp; roaming</div>
+      <p>Client connection and roaming history, with <b>scheduled purge</b>
+      (5 min / hourly / daily / weekly / monthly) to keep data volume under control.</p>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Architecture &amp; deployment</div>
+      <div class="arch">          HTTPS (8443)
+ Browser ──────────────▶   WireMetry
+                         (Docker containers)
+                                │
+                                ▼
+                          WLC controller
+                          (Cisco / Ruckus)</div>
+      <table class="kv" style="margin-top:6px">
+        <tr><td class="k">Deployment</td><td class="v">Docker / Docker Compose containers</td></tr>
+        <tr><td class="k">Access</td><td class="v">Secure web interface — HTTPS (port 8443)</td></tr>
+        <tr><td class="k">Hosting</td><td class="v">On-premise — your data stays on-site</td></tr>
+        <tr><td class="k">WLC integration</td><td class="v">Cisco Catalyst 9800 · Ruckus SmartZone</td></tr>
+      </table>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Security</div>
+      <ul class="feat">
+        <li><b>Secure-token</b> authentication, session expiry, admin / viewer roles.</li>
+        <li><b>Strong password hashing</b>, forced rotation on first login.</li>
+        <li>Brute-force protection (login attempt limiting).</li>
+        <li><b>Encryption at rest</b> of controller credentials.</li>
+        <li>Authenticated database, not publicly exposed.</li>
+        <li>Hardened web security headers (anti-clickjacking, HSTS).</li>
+        <li>End-to-end <b>TLS</b> encryption; runs as a non-privileged container.</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Requirements &amp; sizing</div>
+      <table class="sizing">
+        <tr><th>Profile</th><th>APs</th><th>Clients</th><th>vCPU</th><th>RAM</th><th>Disk</th></tr>
+        <tr><td class="profile">Small</td><td>≤ 250</td><td>≤ 1,000</td><td>2</td><td>4 GB</td><td>40 GB</td></tr>
+        <tr><td class="profile">Medium</td><td>≤ 1,500</td><td>≤ 3,000</td><td>4</td><td>8 GB</td><td>80 GB</td></tr>
+        <tr><td class="profile">Large</td><td>≤ 6,000</td><td>≤ 5,000</td><td>4–8</td><td>16 GB</td><td>150–200 GB</td></tr>
+      </table>
+      <p class="note">Disk size depends on history retention (scheduled purge).</p>
+      <table class="kv" style="margin-top:5px">
+        <tr><td class="k">System</td><td class="v">Linux (Ubuntu 22.04+), Docker + Compose</td></tr>
+        <tr><td class="k">Network</td><td class="v">HTTPS/API access to the controller</td></tr>
+        <tr><td class="k">Client device</td><td class="v">Modern browser (Chrome, Edge, Firefox)</td></tr>
+      </table>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Deployment</div>
+      <ul class="feat">
+        <li><b>Turnkey</b> install via Docker Compose.</li>
+        <li>Single integrated deployable — <b>HTTPS access on port 8443</b>.</li>
+        <li>Controller configuration from the interface, <b>no restart</b>.</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <div><b>WireMetry</b> — Wireless Intelligence. Technical document.</div>
+    <div>Specifications subject to change without notice. · V1</div>
+  </div>
+
+</body>
+</html>

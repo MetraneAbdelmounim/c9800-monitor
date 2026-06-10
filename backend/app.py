@@ -17,6 +17,7 @@ from services.cisco_client import C9800RestconfClient
 from services.collector import ClientCollector
 from services.events import EventEngine
 from services.cleanup import CleanupScheduler
+from services.settings_watcher import SettingsWatcher
 from services.auth import init_auth, bootstrap_admin, require_auth
 from services.settings import (
     init_settings, get_wlc_settings, get_demo_mode_override, get_setup_complete,
@@ -77,6 +78,7 @@ init_settings(mongo_db)
 client = None
 collector = None
 event_engine = None
+settings_watcher = None
 
 
 def effective_demo_mode() -> bool:
@@ -113,31 +115,43 @@ def swap_wlc_client():
         collector.rc = client
     if event_engine is not None:
         event_engine.rc = client
+    if settings_watcher is not None:
+        settings_watcher.mark_synced()   # this process is already up to date
 
 
 register_swap_callback(swap_wlc_client)
 
-# ── Background workers ─────────────────────────────────
-# Start the polling threads in exactly ONE process. Under the Flask debug
-# reloader the script runs twice (watcher parent + serving child); only the
-# child sets WERKZEUG_RUN_MAIN. Starting workers in both would leave a second
-# collector polling the stale (pre-swap) client — e.g. still hitting the old
-# Cisco controller after you switch the vendor to Ruckus. Gunicorn (prod) has
-# no reloader, so workers start normally there.
-_run_workers = (not FLASK_DEBUG) or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+# ── Background workers & settings sync ─────────────────
+# Two independent gates:
+#  • _is_primary — true in production; under the dev reloader, true only in the
+#    serving child (WERKZEUG_RUN_MAIN), so threads don't run twice in one host.
+#  • RUN_WORKERS — true for the all-in-one container and the dedicated worker;
+#    set false on web replicas so they DON'T poll (avoids N× load on the WLC and
+#    duplicate event/cleanup runs). See docker-compose.scale.yml.
+_is_primary = (not FLASK_DEBUG) or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+_run_workers = RUN_WORKERS and _is_primary
 
 collector = ClientCollector(client, mongo_db, interval=COLLECT_INTERVAL)
 cleanup_scheduler = CleanupScheduler(mongo_db)
 register_cleanup(cleanup_scheduler)
 event_engine = EventEngine(client, mongo_db, interval=60)
 register_engine(event_engine)
+# Every instance (worker or web replica) watches for settings edits made
+# elsewhere so its own live client — used for on-demand WLC reads — stays current.
+settings_watcher = SettingsWatcher(mongo_db, swap_wlc_client)
 
 if _run_workers:
     collector.start();        atexit.register(collector.stop)
     cleanup_scheduler.start(); atexit.register(cleanup_scheduler.stop)
     event_engine.start();      atexit.register(event_engine.stop)
+    log.info("Background workers STARTED (collector + events + cleanup)")
+elif _is_primary:
+    log.info("Web/API role — background workers disabled (RUN_WORKERS=false)")
 else:
-    log.info("Reloader parent process — background workers not started (avoids duplicate polling)")
+    log.info("Reloader parent process — background workers not started")
+
+if _is_primary:
+    settings_watcher.start(); atexit.register(settings_watcher.stop)
 
 # ── Blueprints ─────────────────────────────────────────
 init_api(lambda: client, mongo_db, effective_demo_mode)

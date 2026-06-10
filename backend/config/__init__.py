@@ -49,6 +49,10 @@ FLASK_PORT = _int("FLASK_PORT", 5000)
 FLASK_DEBUG = _bool("FLASK_DEBUG", True)
 # Comma-separated allowed CORS origins; "*" only acceptable in dev.
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+# Run the background pollers (collector/events/cleanup) in this instance.
+# Default True = all-in-one container. Set False on web replicas when splitting
+# the web tier from a single dedicated worker (see docker-compose.scale.yml).
+RUN_WORKERS = _bool("RUN_WORKERS", True)
 
 # ── Demo Mode ──────────────────────────────────────────
 DEMO_MODE = _bool("DEMO_MODE", False)

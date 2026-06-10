@@ -88,11 +88,34 @@ Open **https://<server>:8443/** — accept the self-signed warning, then log in 
 | Mongo shell | `docker compose exec mongo mongosh c9800_monitor` |
 | Rotate cert | re-run `gen-cert.sh`, then `docker compose restart nginx` |
 
+## Scaling
+
+The default single container does everything (web + polling) and suits most sites —
+**scale it vertically first** (bigger VM per the sizing table) since the workload is
+I/O-bound. When you need to scale the web tier or want background work isolated from
+request handling, split into a **web tier** and a **single background worker**:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --build
+```
+
+This sets `backend` to `RUN_WORKERS=false` (web/API only) and adds a `worker`
+service (`RUN_WORKERS=true`) that is the sole instance polling the WLC, evaluating
+events and running cleanup. Settings edited in the UI propagate to the worker
+automatically (a `SettingsWatcher` re-reads MongoDB), so no restart is needed.
+
+- **Keep the worker at one replica** — duplicating it duplicates WLC polling.
+- **Scaling the web tier to N replicas** (`--scale backend=3`) additionally needs:
+  (1) an nginx `resolver` tweak so it round-robins across replicas, and
+  (2) Redis for a shared login rate-limit counter (`RATELIMIT_STORAGE=redis://…`).
+  Both are documented at the top of `docker-compose.scale.yml`.
+
 ## Notes
 
-- **Single gunicorn worker** is intentional — the app runs an in-process background
-  collector thread and holds the live RESTCONF client; multiple workers would poll
-  the WLC in duplicate. Request concurrency is handled by threads.
+- **Single gunicorn worker** is intentional in the all-in-one container — it runs the
+  in-process background collector thread and holds the live WLC client; multiple
+  workers would poll the WLC in duplicate. Request concurrency is handled by threads.
+  To scale, use the web/worker split above rather than raising `--workers`.
 - The backend reaches the WLC over the host network; ensure the Docker host can
   route to `WLC_HOST`. (Containers use the default bridge, which can reach the LAN.)
 - To change the published port, edit the `nginx` `ports:` mapping in
