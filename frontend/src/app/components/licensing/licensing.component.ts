@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { timeout } from 'rxjs';
 import { LicenseService, LicenseInfo } from '../../services/license.service';
 import { AuthService } from '../../services/auth.service';
 
@@ -46,7 +47,7 @@ export class LicensingComponent implements OnInit {
     const key = this.key.trim();
     if (!key) { this.error = 'Paste your license key or choose the license file.'; return; }
     this.busy = true; this.error = '';
-    this.svc.activate(key).subscribe({
+    this.svc.activate(key).pipe(timeout(15000)).subscribe({
       next: i => {
         this.busy = false;
         this.info = i;
@@ -55,7 +56,13 @@ export class LicensingComponent implements OnInit {
       },
       error: e => {
         this.busy = false;
-        this.error = e?.error?.error || 'Activation failed — check the key and try again.';
+        if (e?.name === 'TimeoutError') {
+          this.error = 'No response from the server (timeout). The backend may not be updated/running — rebuild the image.';
+        } else if (e?.error?.error) {
+          this.error = e.error.error;                       // backend message
+        } else {
+          this.error = `Activation failed (HTTP ${e?.status ?? 'network error'}).`;
+        }
       },
     });
   }
