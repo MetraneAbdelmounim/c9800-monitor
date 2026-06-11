@@ -37,8 +37,7 @@ services:
       - MONGO_URI=mongodb://mongo:27017
       - FLASK_DEBUG=false
       - RUN_WORKERS=true         # the single polling instance — do NOT scale > 1
-    volumes:
-      - ./license.key:/app/license.key:ro
+      # License via LICENSE_KEY in .env (env_file above) — no file mount.
     depends_on:
       mongo:
         condition: service_healthy
