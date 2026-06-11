@@ -6,6 +6,7 @@ import { filter } from 'rxjs/operators';
 import { WlcService } from './services/wlc.service';
 import { AuthService } from './services/auth.service';
 import { ThemeService } from './services/theme.service';
+import { LicenseService } from './services/license.service';
 
 @Component({
   selector: 'app-root',
@@ -21,6 +22,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
+  private license = inject(LicenseService);
   private router = inject(Router);
 
   navItems = [
@@ -49,6 +51,7 @@ export class AppComponent implements OnInit, OnDestroy {
   adminNavItems = [
     { path: '/admin', label: 'Users', icon: '◆' },
     { path: '/settings', label: 'WLC Settings', icon: '⚒' },
+    { path: '/licensing', label: 'License', icon: '🔑' },
   ];
 
   constructor(private http: HttpClient, private wlc: WlcService) {}
@@ -77,6 +80,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private updateChromeVisibility(url: string) {
-    this.hideChrome = url.startsWith('/login') || url.startsWith('/licensing');
+    // Full-screen (no sidebar) on login, and on the licensing page ONLY while
+    // unlicensed (lockdown). A licensed admin revisiting keeps the sidebar.
+    const onLicensing = url.startsWith('/licensing');
+    this.hideChrome = url.startsWith('/login') || (onLicensing && !this.license.isValid());
   }
 }
