@@ -6,7 +6,7 @@ Wires together: MongoDB, auth + settings stores, the swappable WLC client
 scheduler, and the route blueprints (routes/). Business logic lives in
 services/, the vendor-neutral client contract in models/.
 """
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_from_directory, jsonify
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 from pymongo import MongoClient
@@ -28,7 +28,9 @@ from routes.settings_routes import settings_bp, register_swap_callback, register
 from routes.tracking_routes import tracking_bp, init_tracking
 from routes.map_routes import map_bp, init_map
 from routes.event_routes import events_bp, register_engine
+from routes.license_routes import license_bp
 from services.limiter import limiter
+from services.licensing import init_license, is_licensed
 
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
@@ -49,24 +51,6 @@ if _blockers:
             + "\nSet these in your environment/.env. (FLASK_DEBUG=true bypasses this for local dev.)")
 for _w in security_warnings():
     log.warning(f"SECURITY: {_w}")
-
-# ── License gate ───────────────────────────────────────
-# Verify the signed license. Enforced in production (LICENSE_ENFORCE); in dev
-# it's a warning so local work isn't blocked.
-from services.licensing import verify_license, LicenseError
-try:
-    _lic = verify_license()
-    log.info(f"License OK — '{_lic['customer']}' ({_lic['edition']}), "
-             f"expires {_lic['expires']} ({_lic['days_left']} days left)")
-    if _lic["days_left"] <= 30:
-        log.warning(f"License expires in {_lic['days_left']} days — renew soon")
-except LicenseError as _e:
-    if LICENSE_ENFORCE:
-        raise RuntimeError(
-            f"License check failed: {_e}\n"
-            "Provide a valid license via LICENSE_KEY or license.key. "
-            "(Set LICENSE_ENFORCE=false to bypass for internal use.)")
-    log.warning(f"License not enforced — {_e}")
 
 # In Docker, FRONTEND_DIR points at the built Angular bundle so Flask serves the
 # SPA itself (static assets + index.html). Left unset in dev (ng serve).
@@ -91,6 +75,30 @@ mongo_db = mongo_client[MONGO_DB]
 init_auth(mongo_db)
 bootstrap_admin(BOOTSTRAP_ADMIN_USER, BOOTSTRAP_ADMIN_PASS)
 init_settings(mongo_db)
+init_license(mongo_db)   # load stored license (or auto-activate from LICENSE_KEY)
+
+
+# ── License lock gate ──────────────────────────────────
+# Until a valid license is activated, the app is locked: every /api/* call is
+# rejected with 402 EXCEPT auth (to log in), the license endpoints (to activate),
+# and health. Non-API paths (the SPA itself) load so the Licensing page can show.
+_LICENSE_OPEN = ("/api/auth", "/api/license", "/api/health")
+
+
+@app.before_request
+def _license_gate():
+    if not LICENSE_ENFORCE or request.method == "OPTIONS":
+        return None
+    path = request.path
+    if not path.startswith("/api/"):
+        return None
+    if any(path == p or path.startswith(p + "/") for p in _LICENSE_OPEN):
+        return None
+    if not is_licensed():
+        return jsonify({"error": "license_required",
+                        "message": "Activate a license to use the application."}), 402
+    return None
+
 
 # ── Live WLC client (vendor-selectable, demo override wins) ─
 client = None
@@ -192,6 +200,7 @@ app.register_blueprint(settings_bp)
 app.register_blueprint(tracking_bp)
 app.register_blueprint(map_bp)
 app.register_blueprint(events_bp)
+app.register_blueprint(license_bp)
 
 # ── Serve built frontend (production / Docker) ─────────
 # Hash routing means the SPA only requests "/" + static assets — index + Flask's

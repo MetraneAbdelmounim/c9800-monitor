@@ -77,6 +77,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private updateChromeVisibility(url: string) {
-    this.hideChrome = url.startsWith('/login');
+    this.hideChrome = url.startsWith('/login') || url.startsWith('/licensing');
   }
 }

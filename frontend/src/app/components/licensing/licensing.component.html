@@ -1,0 +1,62 @@
+<div class="lic-page">
+  <div class="lic-card">
+    <div class="lic-header">
+      <svg class="lic-mark" width="48" height="48" viewBox="0 0 36 36" aria-hidden="true">
+        <rect width="36" height="36" rx="10" fill="#1B3A6B"/>
+        <g fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round">
+          <path d="M9.5 16.5a12 12 0 0 1 17 0"/>
+          <path d="M13.5 20.5a6.5 6.5 0 0 1 9 0"/>
+        </g>
+        <circle cx="18" cy="25" r="2.1" fill="#C8102E"/>
+      </svg>
+      <h1 class="lic-title">Activate WireMetry</h1>
+      <div class="lic-sub">A valid license is required to use the application</div>
+    </div>
+
+    <!-- Current status -->
+    <div class="status" *ngIf="info">
+      <div class="status-row" *ngIf="info.valid; else notValid">
+        <span class="badge ok">Licensed</span>
+        <div class="status-detail">
+          <div><b>{{ info.customer }}</b> · {{ info.edition }}</div>
+          <div class="dim">Expires {{ info.expires }} · {{ info.days_left }} days left</div>
+        </div>
+      </div>
+      <ng-template #notValid>
+        <div class="status-row">
+          <span class="badge bad">Not activated</span>
+          <div class="status-detail dim">{{ info.error || 'No active license on this server.' }}</div>
+        </div>
+      </ng-template>
+    </div>
+
+    <!-- Admin: upload / paste -->
+    <ng-container *ngIf="isAdmin; else viewerMsg">
+      <div class="upload">
+        <label class="file-btn">
+          <input type="file" accept=".key,.txt,text/plain" (change)="onFile($event)" hidden/>
+          <span>📄 Choose license file</span>
+        </label>
+        <span class="file-name" *ngIf="fileName">{{ fileName }}</span>
+
+        <div class="or">or paste the license key</div>
+        <textarea class="key-input" rows="4" [(ngModel)]="key"
+                  placeholder="WMLIC1...."></textarea>
+
+        <div class="error" *ngIf="error">{{ error }}</div>
+
+        <button class="btn primary" (click)="activate()" [disabled]="busy">
+          {{ busy ? 'Activating...' : 'Activate license' }}
+        </button>
+      </div>
+    </ng-container>
+    <ng-template #viewerMsg>
+      <div class="viewer-note">
+        This application isn't licensed yet. Please ask an <b>administrator</b> to
+        upload the license key.
+      </div>
+    </ng-template>
+
+    <button class="link-out" (click)="logout()">Sign out</button>
+  </div>
+</div>

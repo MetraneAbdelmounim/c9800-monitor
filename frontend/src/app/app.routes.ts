@@ -17,27 +17,31 @@ import { LoginComponent } from './components/login/login.component';
 import { AdminComponent } from './components/admin/admin.component';
 import { SettingsComponent } from './components/settings/settings.component';
 import { ProfileComponent } from './components/profile/profile.component';
+import { LicensingComponent } from './components/licensing/licensing.component';
 import { authGuard, adminGuard } from './guards/auth.guard';
+import { licenseGuard } from './guards/license.guard';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
+  // Reachable while unlicensed (authGuard only) so an admin can activate.
+  { path: 'licensing', component: LicensingComponent, canActivate: [authGuard] },
   { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
-  { path: 'access-points', component: ApListComponent, canActivate: [authGuard] },
-  { path: 'map', component: ApMapComponent, canActivate: [authGuard] },
-  { path: 'clients', component: ClientListComponent, canActivate: [authGuard] },
-  { path: 'client-experience', component: ClientExperienceComponent, canActivate: [authGuard] },
-  { path: 'wlans', component: WlanListComponent, canActivate: [authGuard] },
-  { path: 'rf-conflicts', component: ChannelConflictsComponent, canActivate: [authGuard] },
-  { path: 'lifecycle', component: ApLifecycleComponent, canActivate: [authGuard] },
-  { path: 'advisor', component: AdvisorComponent, canActivate: [authGuard] },
-  { path: 'system', component: SystemInfoComponent, canActivate: [authGuard] },
-  { path: 'roaming-graph', component: RoamingGraphComponent, canActivate: [authGuard] },
-  { path: 'tracking', component: ClientTrackingComponent, canActivate: [authGuard] },
-  { path: 'trends', component: TrendsComponent, canActivate: [authGuard] },
-  { path: 'events', component: SecurityEventsComponent, canActivate: [authGuard] },
+  { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'access-points', component: ApListComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'map', component: ApMapComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'clients', component: ClientListComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'client-experience', component: ClientExperienceComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'wlans', component: WlanListComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'rf-conflicts', component: ChannelConflictsComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'lifecycle', component: ApLifecycleComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'advisor', component: AdvisorComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'system', component: SystemInfoComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'roaming-graph', component: RoamingGraphComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'tracking', component: ClientTrackingComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'trends', component: TrendsComponent, canActivate: [authGuard, licenseGuard] },
+  { path: 'events', component: SecurityEventsComponent, canActivate: [authGuard, licenseGuard] },
   { path: 'profile', component: ProfileComponent, canActivate: [authGuard] },
-  { path: 'admin', component: AdminComponent, canActivate: [adminGuard] },
-  { path: 'settings', component: SettingsComponent, canActivate: [adminGuard] },
+  { path: 'admin', component: AdminComponent, canActivate: [adminGuard, licenseGuard] },
+  { path: 'settings', component: SettingsComponent, canActivate: [adminGuard, licenseGuard] },
   { path: '**', redirectTo: 'dashboard' },
 ];

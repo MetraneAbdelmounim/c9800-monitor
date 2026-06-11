@@ -49,23 +49,32 @@ python tools/gen_license.py --customer "ACME" --expires 2027-12-31 \
 The first run auto-creates the keypair. **Back up `tools/license_private_key.pem`** — if you
 lose it you can't issue licenses that existing builds accept (you'd have to re-key + rebuild).
 
-### Deliver to the client
-Give them the issued `license.key`. They provide it one of two ways:
-- **Mount it** (default): place it next to `docker-compose.yml`; it's mounted read-only to
-  `/app/license.key`. Already wired in `docker-compose.yml`.
-- **Env var**: set `LICENSE_KEY=<token>` in `.env`.
+### Deliver to the client (upload flow)
+Give them the issued `license.key`. The app **boots locked** and the client activates it
+**in the UI**:
+1. The client opens the app and logs in as an **admin**.
+2. They're sent to the **Licensing page** (the rest of the app is locked).
+3. They **choose the `license.key` file** (or paste the token) and click **Activate**.
+4. The token is verified and **stored in MongoDB**; the app unlocks immediately and stays
+   licensed across restarts.
+
+Optional automated install: set `LICENSE_KEY=<token>` in `.env` and it auto-activates on
+first boot (no manual upload).
 
 ### Behaviour
-- **Production** (`FLASK_DEBUG=false`): a missing/invalid/expired license **stops startup**
-  with a clear log message. (`LICENSE_ENFORCE` defaults to on in production.)
-- **Dev** (`FLASK_DEBUG=true`): it's a warning only, so local work isn't blocked.
-- Override anytime with `LICENSE_ENFORCE=true|false`.
-- Within 30 days of expiry the backend logs a renewal warning. License status is also
-  returned by `GET /api/setup/status` (`license` field) for a future GUI badge.
+- **Locked until activated**: every `/api/*` call returns `402 license_required` except
+  login, the license endpoints, and health — so an admin can sign in and activate, but no
+  data loads and settings can't change. The frontend redirects to `/licensing`.
+- **Persisted**: stored in Mongo (`settings._id="license"`); re-loaded each startup.
+- **Expiry**: enforced live — an expired license re-locks the app. Within 30 days the
+  backend logs a renewal warning.
+- `LICENSE_ENFORCE=false` disables the lock entirely (internal use).
+- Status API: `GET /api/license` (and the `license` field of `GET /api/setup/status`).
+- Activate API (admin): `POST /api/license` with `{ "key": "WMLIC1...." }`.
 
 ### Renew / revoke
-- **Renew**: issue a new `license.key` with a later expiry; client swaps the file and
-  restarts. (No rebuild needed.)
+- **Renew**: issue a new `license.key` with a later expiry; the client re-uploads it on the
+  Licensing page — it overwrites the stored one, no restart needed.
 - **Revoke**: licenses are offline-verified, so there's no live kill switch — use a short
   expiry (e.g. 12 months) and machine-binding for control. Re-keying (new keypair + rebuilt
   image) invalidates all old licenses if needed.
