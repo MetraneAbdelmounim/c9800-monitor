@@ -13,6 +13,12 @@ venv/
 .env.local
 backend/.env
 
+# Licensing — NEVER commit the signing key or issued client licenses
+tools/license_private_key.pem
+tools/license_public_key.hex
+license.key
+*.key
+
 # Angular build / cache
 frontend/.angular/
 frontend/dist/

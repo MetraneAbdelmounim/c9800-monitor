@@ -54,6 +54,11 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 # the web tier from a single dedicated worker (see docker-compose.scale.yml).
 RUN_WORKERS = _bool("RUN_WORKERS", True)
 
+# ── Licensing ──────────────────────────────────────────
+# Require a valid signed license at startup. Defaults to enforced in production
+# (FLASK_DEBUG=false); set LICENSE_ENFORCE=false to disable (e.g. internal runs).
+LICENSE_ENFORCE = _bool("LICENSE_ENFORCE", not FLASK_DEBUG)
+
 # ── Demo Mode ──────────────────────────────────────────
 DEMO_MODE = _bool("DEMO_MODE", False)
 

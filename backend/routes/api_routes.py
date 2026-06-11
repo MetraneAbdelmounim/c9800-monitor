@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request, g
 from services.auth import require_auth, require_role
 from services.settings import get_target_version, set_target_version, get_setup_complete
 from services.advisor import build_recommendations
+from services.licensing import get_license_info
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -184,4 +185,5 @@ def setup_status():
         "setup_complete": get_setup_complete(),
         "demo_mode": _demo_mode(),
         "user_count": _db["users"].estimated_document_count(),
+        "license": get_license_info(),
     })

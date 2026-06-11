@@ -50,6 +50,24 @@ if _blockers:
 for _w in security_warnings():
     log.warning(f"SECURITY: {_w}")
 
+# ── License gate ───────────────────────────────────────
+# Verify the signed license. Enforced in production (LICENSE_ENFORCE); in dev
+# it's a warning so local work isn't blocked.
+from services.licensing import verify_license, LicenseError
+try:
+    _lic = verify_license()
+    log.info(f"License OK — '{_lic['customer']}' ({_lic['edition']}), "
+             f"expires {_lic['expires']} ({_lic['days_left']} days left)")
+    if _lic["days_left"] <= 30:
+        log.warning(f"License expires in {_lic['days_left']} days — renew soon")
+except LicenseError as _e:
+    if LICENSE_ENFORCE:
+        raise RuntimeError(
+            f"License check failed: {_e}\n"
+            "Provide a valid license via LICENSE_KEY or license.key. "
+            "(Set LICENSE_ENFORCE=false to bypass for internal use.)")
+    log.warning(f"License not enforced — {_e}")
+
 # In Docker, FRONTEND_DIR points at the built Angular bundle so Flask serves the
 # SPA itself (static assets + index.html). Left unset in dev (ng serve).
 FRONTEND_DIR = os.getenv("FRONTEND_DIR")

@@ -49,6 +49,22 @@ def _first(d, *keys, default=None):
     return default
 
 
+def _to_mb(v):
+    """Normalize a size to MB, auto-detecting the unit (bytes / KB / MB) by
+    magnitude — SmartZone reports memory/disk inconsistently across versions."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return 0.0
+    if v <= 0:
+        return 0.0
+    if v >= 1e9:                 # bytes (≥ ~1 GB worth)
+        return v / (1024 * 1024)
+    if v >= 1e6:                 # KB
+        return v / 1024
+    return v                     # already MB
+
+
 def _band_from_channel(ch):
     if 1 <= ch <= 14:
         return "2.4 GHz"
@@ -170,12 +186,35 @@ class RuckusClient(WlcClient):
         return {"five_seconds": p, "one_minute": p, "five_minutes": p}
 
     def get_memory_usage(self):
-        _, st = self._node()
+        ctrl, st = self._node()
         pools = []
         mem = st.get("memory") or {}
         if mem:
-            pools.append({"name": "System Memory", "total_mb": 0, "used_mb": 0,
-                          "used_percent": round(mem.get("percent", 0) or 0, 1)})
+            pct = mem.get("percent")
+            total = _first(mem, "total", "totalSize", "totalMemory", "totalBytes",
+                           "totalInBytes", "max")
+            # Total RAM may live on the controller node object instead of the sample.
+            if not total:
+                total = _first(ctrl, "totalMemory", "memorySize", "memTotal", "ramSize")
+            used = _first(mem, "used", "usedSize", "usedBytes", "usedInBytes")
+            free = _first(mem, "free", "freeSize", "available", "freeBytes", "freeInBytes")
+
+            pool = {"name": "System Memory", "total_mb": 0, "used_mb": 0,
+                    "used_percent": round(pct or 0, 1)}
+            if total:
+                t = _to_mb(total)
+                if used is not None:
+                    u = _to_mb(used)
+                elif free is not None:
+                    u = t - _to_mb(free)
+                else:                       # only a percentage available → derive GB from it
+                    u = (pct or 0) / 100.0 * t
+                pool["total_mb"] = round(t)
+                pool["used_mb"] = round(u)
+                pool["free_mb"] = round(max(0.0, t - u))
+                if pct is None and t:
+                    pool["used_percent"] = round(u / t * 100, 1)
+            pools.append(pool)
         disk = st.get("disk") or {}
         total, free = disk.get("total"), disk.get("free")
         if total:

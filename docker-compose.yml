@@ -27,6 +27,10 @@ services:
       - MONGO_URI=mongodb://mongo:27017
       - FRONTEND_DIR=/app/frontend
       - FLASK_DEBUG=false
+    volumes:
+      # Per-customer license (read-only). Replace ./license.key with the client's
+      # issued file. Alternatively set LICENSE_KEY in .env instead of mounting.
+      - ./license.key:/app/license.key:ro
     depends_on:
       mongo:
         condition: service_healthy
