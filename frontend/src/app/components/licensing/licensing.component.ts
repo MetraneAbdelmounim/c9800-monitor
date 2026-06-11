@@ -51,8 +51,13 @@ export class LicensingComponent implements OnInit {
       next: i => {
         this.busy = false;
         this.info = i;
-        if (i.valid) this.router.navigate(['/dashboard']);
-        else this.error = i.error || 'License is not valid.';
+        if (!i.valid) { this.error = i.error || 'License is not valid.'; return; }
+        // A still-pending forced password change takes precedence over the app.
+        if (this.auth.mustChangePassword()) {
+          this.router.navigateByUrl('/profile?forced=1');
+        } else {
+          this.router.navigate(['/dashboard']);
+        }
       },
       error: e => {
         this.busy = false;

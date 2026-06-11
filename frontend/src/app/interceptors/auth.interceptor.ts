@@ -18,8 +18,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (err.status === 401 && !req.url.endsWith('/auth/login')) {
         auth.logout();
         router.navigate(['/login'], { queryParams: { returnUrl: router.url } });
-      } else if (err.status === 402 && !req.url.endsWith('/license')) {
-        // App is locked (no valid license) — send the user to activation.
+      } else if (err.status === 402 && !req.url.endsWith('/license') && !auth.mustChangePassword()) {
+        // App is locked (no valid license) — send the user to activation, UNLESS a
+        // forced password change is still pending (that flow takes precedence).
         router.navigate(['/licensing']);
       }
       return throwError(() => err);
