@@ -7,16 +7,17 @@ __pycache__/
 *.egg-info/
 venv/
 .venv/
+
+# Claude Code (local agent settings / memory)
 .claude/
+
 # Env / secrets
 .env
 .env.local
 backend/.env
 
-# Licensing — NEVER commit the signing key or issued client licenses
+# Licensing — vendor tooling, signing key, and issued client licenses (never commit)
 tools/
-tools/license_private_key.pem
-tools/license_public_key.hex
 license.key
 *.key
 
