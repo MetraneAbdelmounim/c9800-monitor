@@ -36,22 +36,38 @@ def _b64url(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).decode().rstrip("=")
 
 
-def _ensure_keypair():
-    if os.path.exists(PRIV_PATH):
-        with open(PRIV_PATH, "rb") as f:
-            priv = serialization.load_pem_private_key(f.read(), password=None)
-    else:
+def _load_keypair(allow_init=False):
+    """Load the vendor signing key. Refuses to silently create one — a missing
+    key almost always means "this isn't the vendor machine", and auto-generating
+    a fresh key would mint licenses the SHIPPED app won't accept (its embedded
+    public key differs) and quietly fork your signing identity."""
+    if not os.path.exists(PRIV_PATH):
+        if not allow_init:
+            raise SystemExit(
+                "\nERROR: signing key not found at:\n  " + PRIV_PATH + "\n\n"
+                "This is the VENDOR private key — only the license issuer should have it.\n"
+                "  - If you ARE the issuer: restore the key file to that path (back it up!).\n"
+                "  - Genuine FIRST-TIME vendor setup only: re-run with  --init-keys\n"
+                "    then embed the printed public key in backend/services/licensing.py\n"
+                "    (_PUBLIC_KEY_HEX) and rebuild the app image.\n")
         priv = Ed25519PrivateKey.generate()
         with open(PRIV_PATH, "wb") as f:
             f.write(priv.private_bytes(
                 serialization.Encoding.PEM,
                 serialization.PrivateFormat.PKCS8,
                 serialization.NoEncryption()))
-        os.chmod(PRIV_PATH, 0o600)
-        print(f"[gen] created private key -> {PRIV_PATH}  (KEEP SECRET)")
-    pub_raw = priv.public_key().public_bytes(
-        serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-    pub_hex = pub_raw.hex()
+        try:
+            os.chmod(PRIV_PATH, 0o600)
+        except OSError:
+            pass
+        print(f"[gen] created a NEW signing key -> {PRIV_PATH}  (KEEP SECRET — back it up)")
+        print("[gen] You must embed the public key below in licensing.py and rebuild.")
+    else:
+        with open(PRIV_PATH, "rb") as f:
+            priv = serialization.load_pem_private_key(f.read(), password=None)
+
+    pub_hex = priv.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex()
     with open(PUB_HEX_PATH, "w") as f:
         f.write(pub_hex)
     return priv, pub_hex
@@ -72,7 +88,7 @@ def make_token(priv, customer, expires, edition, machine_id):
 
 def main():
     ap = argparse.ArgumentParser(description="Generate a signed WireMetry license.")
-    ap.add_argument("--customer", required=True, help="Client name embedded in the license")
+    ap.add_argument("--customer", help="Client name embedded in the license")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--days", type=int, help="Valid for N days from today")
     g.add_argument("--expires", help="Explicit expiry date YYYY-MM-DD")
@@ -80,9 +96,17 @@ def main():
     ap.add_argument("--machine-id", default=None,
                     help="Optional: bind to a machine fingerprint (see LICENSE_MACHINE_ID)")
     ap.add_argument("--out", default="license.key")
+    ap.add_argument("--init-keys", action="store_true",
+                    help="VENDOR first-time setup ONLY: create a new signing keypair")
     args = ap.parse_args()
 
-    priv, pub_hex = _ensure_keypair()
+    priv, pub_hex = _load_keypair(allow_init=args.init_keys)
+
+    if not args.customer:
+        if args.init_keys:
+            print(f"\nPublic key (embed in backend/services/licensing.py, _PUBLIC_KEY_HEX):\n{pub_hex}")
+            return
+        ap.error("--customer is required to issue a license")
 
     if args.expires:
         expires = args.expires
