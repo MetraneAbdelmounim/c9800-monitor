@@ -136,7 +136,7 @@ def _list_enabled_sites():
     return sites
 
 
-site_manager = SiteManager(_list_enabled_sites, _build_site_client)
+site_manager = SiteManager(_list_enabled_sites, _build_site_client, api_cache_ttl=API_CACHE_TTL)
 
 
 def swap_wlc_client():

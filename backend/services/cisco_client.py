@@ -3,6 +3,7 @@ Cisco C9800 RESTCONF Client
 Tailored for IOS-XE 17.15.x YANG model output.
 Optimized: request caching, connection pooling, session duration calc.
 """
+import os
 import requests
 import urllib3
 import logging
@@ -102,10 +103,13 @@ class C9800RestconfClient:
             "Accept": "application/yang-data+json",
             "Content-Type": "application/yang-data+json",
         })
-        # total=3 + backoff_factor=1.0 -> retries at ~1s, 2s, 4s, which rides out
-        # the transient 502s the controller emits while its RESTCONF/pubd process
-        # is busy or recycling (instead of giving up after ~1.5s).
-        retry = Retry(total=3, backoff_factor=1.0, status_forcelist=[502, 503, 504])
+        # total=2 + backoff_factor=0.5 -> retries at ~0.5s, 1s. Still rides out the
+        # transient 502s the controller emits while RESTCONF/pubd is busy, but caps
+        # the worst-case added latency (~1.5s vs ~7s) so pages stay responsive.
+        # Tune with WLC_HTTP_RETRIES / WLC_HTTP_BACKOFF if the controller is flaky.
+        _retries = int(os.getenv("WLC_HTTP_RETRIES", "2"))
+        _backoff = float(os.getenv("WLC_HTTP_BACKOFF", "0.5"))
+        retry = Retry(total=_retries, backoff_factor=_backoff, status_forcelist=[502, 503, 504])
         adapter = HTTPAdapter(max_retries=retry, pool_connections=10, pool_maxsize=20)
         self.session.mount("https://", adapter)
         self._cache = {}
