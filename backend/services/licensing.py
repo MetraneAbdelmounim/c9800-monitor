@@ -91,6 +91,7 @@ def verify_token(token: str):
         "expires": expires,
         "days_left": (exp - now).days,
         "machine_bound": bool(mid),
+        "max_sites": payload.get("max_sites"),   # None = unlimited
         "valid": True,
     }
     return info, exp
@@ -172,6 +173,12 @@ def is_licensed() -> bool:
         _cache(_state["token"], {"valid": False, "error": "expired"}, exp)
         return False
     return True
+
+
+def max_sites():
+    """Site cap from the license, or None for unlimited (claim absent)."""
+    info = _state["info"] or {}
+    return info.get("max_sites") if info.get("valid") else None
 
 
 def get_license_info():

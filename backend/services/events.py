@@ -31,8 +31,11 @@ _SEV_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
 class EventEngine:
-    def __init__(self, restconf_client, mongo_db, interval=60):
-        self.rc = restconf_client
+    def __init__(self, site_provider, mongo_db, interval=60):
+        # site_provider() -> [{id, name, location, client}, ...]
+        self.sites = site_provider
+        self.rc = None          # set per-site during evaluation
+        self.site_id = None
         self.db = mongo_db
         self.interval = interval
         self._running = False
@@ -67,36 +70,49 @@ class EventEngine:
 
     # ── evaluation ─────────────────────────────────────
     def evaluate(self):
+        for entry in self.sites():
+            try:
+                self._evaluate_site(entry)
+            except Exception as e:
+                log.error(f"event evaluate site {entry.get('name')}: {e}")
+
+    def _evaluate_site(self, entry):
+        self.rc = entry["client"]
+        self.site_id = entry["id"]
+        site_name = entry.get("name", self.site_id)
+
         current = []
         for collector in (self._rogues, self._dup_addr, self._lifecycle,
                           self._awips, self._rf, self._client_snr):
             try:
                 current.extend(collector())
             except Exception as e:
-                log.error(f"event source {collector.__name__} failed: {e}")
+                log.error(f"event source {collector.__name__}[{site_name}] failed: {e}")
 
         now = datetime.now(timezone.utc)
         seen = set()
         for e in current:
-            seen.add(e["key"])
+            key = f"{self.site_id}:{e['key']}"        # namespace per site
+            seen.add(key)
             self.db["events"].update_one(
-                {"key": e["key"]},
+                {"key": key},
                 {"$set": {
                     "type": e["type"], "category": e["category"],
                     "severity": e["severity"], "score": e["score"],
                     "title": e["title"], "detail": e["detail"],
                     "ap_name": e.get("ap_name", ""), "ssid": e.get("ssid", ""),
+                    "site_id": self.site_id, "site_name": site_name,
                     "last_seen": now, "active": True,
                  },
-                 "$setOnInsert": {"key": e["key"], "first_seen": now, "acked": False}},
+                 "$setOnInsert": {"key": key, "first_seen": now, "acked": False}},
                 upsert=True,
             )
-        # Anything not seen this cycle is no longer active (resolved), but kept.
+        # Resolve events for THIS site not seen this cycle (keep until acked).
         self.db["events"].update_many(
-            {"active": True, "key": {"$nin": list(seen)}},
+            {"active": True, "site_id": self.site_id, "key": {"$nin": list(seen)}},
             {"$set": {"active": False, "resolved_at": now}},
         )
-        log.debug(f"event evaluate: {len(seen)} active events")
+        log.debug(f"event evaluate[{site_name}]: {len(seen)} active events")
 
     # ── sources ────────────────────────────────────────
     def _rogues(self):
@@ -207,7 +223,8 @@ class EventEngine:
                               f"coverage gap in its area; check PoE/uplink.",
                 })
 
-            prev = coll.find_one({"_id": mac})
+            lid = f"{self.site_id}:{mac}"           # per-site lifecycle record
+            prev = coll.find_one({"_id": lid})
             inc = {}
             if prev:
                 pboot, pjoin = prev.get("boot_time", ""), prev.get("join_time", "")
@@ -231,11 +248,12 @@ class EventEngine:
                                   f"(flap #{flaps}).",
                     })
             update = {"$set": {"boot_time": boot, "join_time": join, "name": name,
+                               "site_id": self.site_id, "mac": mac,
                                "version": ap.get("sw_version", ""), "state": ap.get("state", ""),
                                "last_seen": now}}
             if inc:
                 update["$inc"] = inc
-            coll.update_one({"_id": mac}, update, upsert=True)
+            coll.update_one({"_id": lid}, update, upsert=True)
 
         # Firmware-compliance summary (one rolling event)
         target = get_target_version()
@@ -309,16 +327,19 @@ class EventEngine:
         return out
 
     # ── queries / actions (used by routes) ─────────────
-    def list_events(self, show_acked=False):
+    def list_events(self, show_acked=False, site_id=None):
         q = {} if show_acked else {"acked": False}
+        if site_id:
+            q["site_id"] = site_id
         docs = list(self.db["events"].find(q))
         docs.sort(key=lambda d: (_SEV_RANK.get(d.get("severity"), 9),
                                  -(d.get("last_seen").timestamp() if d.get("last_seen") else 0)))
         events = [self._public(d) for d in docs]
+        cq = {"site_id": site_id} if site_id else {}
         return {
             "events": events,
-            "unacked": self.db["events"].count_documents({"acked": False}),
-            "acked": self.db["events"].count_documents({"acked": True}),
+            "unacked": self.db["events"].count_documents({**cq, "acked": False}),
+            "acked": self.db["events"].count_documents({**cq, "acked": True}),
         }
 
     def ack(self, ids, user):
@@ -350,6 +371,7 @@ class EventEngine:
             "severity": d.get("severity"), "score": d.get("score"),
             "title": d.get("title"), "detail": d.get("detail"),
             "ap_name": d.get("ap_name", ""), "ssid": d.get("ssid", ""),
+            "site_id": d.get("site_id", ""), "site_name": d.get("site_name", ""),
             "active": d.get("active", True), "acked": d.get("acked", False),
             "first_seen": d["first_seen"].isoformat() if d.get("first_seen") else None,
             "last_seen": d["last_seen"].isoformat() if d.get("last_seen") else None,

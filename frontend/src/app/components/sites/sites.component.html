@@ -1,0 +1,78 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Sites</h1>
+      <p class="subtitle">Manage the controllers WireMetry monitors — <b>{{ capLabel() }}</b></p>
+    </div>
+    <button class="btn primary" (click)="newSite()" [disabled]="atCap()"
+            [title]="atCap() ? 'License site limit reached' : 'Add a site'">+ Add Site</button>
+  </div>
+
+  <div class="error-banner" *ngIf="error()">{{ error() }}</div>
+  <div class="cap-note" *ngIf="atCap()">
+    You've reached your licensed site limit ({{ maxSites() }}). Upgrade the license to add more.
+  </div>
+
+  <app-spinner *ngIf="loading()" label="Loading sites…"></app-spinner>
+
+  <!-- Add / edit form -->
+  <div class="form-card" *ngIf="formOpen()">
+    <h2>{{ editingId() ? 'Edit site' : 'Add site' }}</h2>
+    <div class="grid">
+      <label>Name <input type="text" [(ngModel)]="f.name" placeholder="Casablanca HQ" /></label>
+      <label>Location <input type="text" [(ngModel)]="f.location" placeholder="Casablanca" /></label>
+      <label>Host / IP <input type="text" [(ngModel)]="f.host" placeholder="192.168.10.5" /></label>
+      <label>Port <input type="number" [(ngModel)]="f.port" /></label>
+      <label>Username <input type="text" [(ngModel)]="f.username" autocomplete="off" /></label>
+      <label>Password
+        <input type="password" [(ngModel)]="f.password" autocomplete="new-password"
+               [placeholder]="editingId() ? 'leave blank to keep current' : ''" />
+      </label>
+      <label class="chk"><input type="checkbox" [(ngModel)]="f.verify_ssl" /> Verify TLS certificate</label>
+      <label class="chk"><input type="checkbox" [(ngModel)]="f.enabled" /> Enabled (monitored)</label>
+    </div>
+
+    <div class="test-row" *ngIf="testResult() as t">
+      <span class="badge" [class.ok]="t.ok" [class.bad]="!t.ok">{{ t.ok ? 'Reachable' : 'Unreachable' }}</span>
+      <span class="dim">{{ t.status }}<span *ngIf="t.error"> — {{ t.error }}</span></span>
+    </div>
+
+    <div class="actions">
+      <button class="btn" (click)="test()" [disabled]="testing() || !f.host">{{ testing() ? 'Testing…' : 'Test connection' }}</button>
+      <span class="spacer"></span>
+      <button class="btn" (click)="cancel()">Cancel</button>
+      <button class="btn primary" (click)="save()" [disabled]="saving() || !f.name || !f.host">{{ saving() ? 'Saving…' : 'Save site' }}</button>
+    </div>
+  </div>
+
+  <!-- Sites table -->
+  <div class="table-card" *ngIf="!loading()">
+    <table *ngIf="sites().length; else empty">
+      <thead>
+        <tr><th>Name</th><th>Location</th><th>Host</th><th>User</th><th>TLS</th><th>Status</th><th class="r">Actions</th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let s of sites(); trackBy: trackById">
+          <td class="name">{{ s.name }}</td>
+          <td class="dim">{{ s.location || '—' }}</td>
+          <td class="mono">{{ s.host }}:{{ s.port }}</td>
+          <td class="dim">{{ s.username || '—' }}</td>
+          <td>{{ s.verify_ssl ? '✓' : '—' }}</td>
+          <td>
+            <button class="pill" [class.on]="s.enabled" (click)="toggleEnabled(s)"
+                    [title]="s.enabled ? 'Click to disable' : 'Click to enable'">
+              {{ s.enabled ? 'Enabled' : 'Disabled' }}
+            </button>
+          </td>
+          <td class="r">
+            <button class="link" (click)="edit(s)">Edit</button>
+            <button class="link danger" (click)="remove(s)">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <ng-template #empty>
+      <div class="empty">No sites yet. Click <b>+ Add Site</b> to add your first controller.</div>
+    </ng-template>
+  </div>
+</div>

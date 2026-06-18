@@ -11,6 +11,7 @@ export interface AuthUser {
 export interface UserRecord {
   username: string;
   role: 'admin' | 'viewer';
+  sites?: string[];
   must_change_password?: boolean;
   created_at?: string;
 }
@@ -73,8 +74,12 @@ export class AuthService {
     return this.http.get<{ total: number; users: UserRecord[] }>(`${this.api}/users`);
   }
 
-  createUser(username: string, password: string, role: 'admin' | 'viewer'): Observable<UserRecord> {
-    return this.http.post<UserRecord>(`${this.api}/register`, { username, password, role });
+  createUser(username: string, password: string, role: 'admin' | 'viewer', sites: string[] = []): Observable<UserRecord> {
+    return this.http.post<UserRecord>(`${this.api}/register`, { username, password, role, sites });
+  }
+
+  updateUser(username: string, payload: { role?: 'admin' | 'viewer'; sites?: string[] }): Observable<UserRecord> {
+    return this.http.put<UserRecord>(`${this.api}/users/${encodeURIComponent(username)}`, payload);
   }
 
   deleteUser(username: string): Observable<{ ok: boolean; deleted: string }> {

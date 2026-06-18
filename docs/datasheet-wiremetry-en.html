@@ -119,10 +119,11 @@
     <div class="highlights">
       <h3>Key points</h3>
       <ul>
+        <li><b>Multi-site</b>: many controllers, NOC overview + per-site access</li>
         <li>Cisco Catalyst 9800 &amp; Ruckus SmartZone, single interface</li>
         <li>RF diagnostics: channel conflicts, spectrum, airtime, noise</li>
-        <li>Security log: rogues &amp; anomalies, acknowledgeable</li>
-        <li>Network advisor: prioritized recommendations</li>
+        <li>Security: rogues &amp; anomalies, acknowledgeable log</li>
+        <li><b>PDF reports</b> + graphical views (list ⇄ charts)</li>
         <li>Docker deployment, HTTPS — your data stays on-site</li>
       </ul>
     </div>
@@ -138,6 +139,25 @@
         <li><b>Access-point inventory</b>: model, status, version, channel, band, RF load, clients.</li>
         <li><b>Clients</b>: RSSI, SNR, channel, radio type; search and statistics.</li>
         <li><b>Controller connectivity</b>: connected / degraded / unreachable.</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Multi-site (multi-controller)</div>
+      <ul class="feat">
+        <li><b>NOC overview</b>: health of every site at a glance (APs online, clients, alerts).</li>
+        <li><b>Site switcher</b>: scope the whole app to one site, drill into details.</li>
+        <li><b>Per-site access control</b>: a viewer only sees the sites assigned to them.</li>
+        <li>Site count is admin-managed and <b>capped by the license</b>.</li>
+      </ul>
+    </div>
+
+    <div class="block">
+      <div class="secbar">Reports &amp; analytics</div>
+      <ul class="feat">
+        <li><b>PDF health report</b> ready to hand to the client (summary, charts, recommendations).</li>
+        <li><b>Graphical views</b>: list ⇄ charts toggle (clients, APs, WLANs, events).</li>
+        <li><b>Modernized dashboard</b>: KPI cards, charts and top findings.</li>
       </ul>
     </div>
 
@@ -213,6 +233,7 @@
         <li>Authenticated database, not publicly exposed.</li>
         <li>Hardened web security headers (anti-clickjacking, HSTS).</li>
         <li>End-to-end <b>TLS</b> encryption; runs as a non-privileged container.</li>
+        <li><b>Signed license</b> activated in-app (expiry, site cap); application code protected (bytecode image).</li>
       </ul>
     </div>
 

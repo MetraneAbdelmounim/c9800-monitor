@@ -2,6 +2,8 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UserRecord } from '../../services/auth.service';
+import { SiteService } from '../../services/site.service';
+import { Site } from '../../models/models';
 
 type Role = 'admin' | 'viewer';
 
@@ -14,9 +16,11 @@ type Role = 'admin' | 'viewer';
 })
 export class AdminComponent implements OnInit {
   private auth = inject(AuthService);
+  private siteSvc = inject(SiteService);
   readonly currentUser = this.auth.user;
 
   users = signal<UserRecord[]>([]);
+  allSites = signal<Site[]>([]);
   loading = signal(true);
   listError = signal<string | null>(null);
 
@@ -24,9 +28,14 @@ export class AdminComponent implements OnInit {
   newUsername = '';
   newPassword = '';
   newRole: Role = 'viewer';
+  newSites: string[] = [];
   createError = signal<string | null>(null);
   createSuccess = signal<string | null>(null);
   creating = signal(false);
+
+  // Per-user site editing
+  editUser: string | null = null;
+  editSites: string[] = [];
 
   // Change own password form
   newOwnPassword = '';
@@ -35,7 +44,38 @@ export class AdminComponent implements OnInit {
   pwSuccess = signal<string | null>(null);
   pwSaving = signal(false);
 
-  ngOnInit() { this.loadUsers(); }
+  ngOnInit() { this.loadUsers(); this.loadSites(); }
+
+  loadSites() {
+    this.siteSvc.list().subscribe({ next: r => this.allSites.set(r.sites || []), error: () => {} });
+  }
+
+  siteName(id: string): string {
+    return this.allSites().find(s => s.id === id)?.name || id;
+  }
+
+  // create-form site toggles
+  toggleNewSite(id: string) {
+    const i = this.newSites.indexOf(id);
+    if (i >= 0) this.newSites.splice(i, 1); else this.newSites.push(id);
+  }
+  isNewSite(id: string) { return this.newSites.includes(id); }
+
+  // per-user site editing
+  startEditSites(u: UserRecord) { this.editUser = u.username; this.editSites = [...(u.sites || [])]; }
+  cancelEditSites() { this.editUser = null; this.editSites = []; }
+  toggleEditSite(id: string) {
+    const i = this.editSites.indexOf(id);
+    if (i >= 0) this.editSites.splice(i, 1); else this.editSites.push(id);
+  }
+  isEditSite(id: string) { return this.editSites.includes(id); }
+  saveEditSites() {
+    if (!this.editUser) return;
+    this.auth.updateUser(this.editUser, { sites: this.editSites }).subscribe({
+      next: () => { this.cancelEditSites(); this.loadUsers(); },
+      error: err => alert(err?.error?.error || 'Failed to update sites'),
+    });
+  }
 
   loadUsers() {
     this.loading.set(true);
@@ -57,13 +97,15 @@ export class AdminComponent implements OnInit {
       return;
     }
     this.creating.set(true);
-    this.auth.createUser(this.newUsername.trim(), this.newPassword, this.newRole).subscribe({
+    const sites = this.newRole === 'viewer' ? this.newSites : [];
+    this.auth.createUser(this.newUsername.trim(), this.newPassword, this.newRole, sites).subscribe({
       next: u => {
         this.creating.set(false);
         this.createSuccess.set(`User "${u.username}" created`);
         this.newUsername = '';
         this.newPassword = '';
         this.newRole = 'viewer';
+        this.newSites = [];
         this.loadUsers();
       },
       error: err => {

@@ -67,7 +67,7 @@ def decode_token(token: str) -> Optional[dict]:
 
 # ── User CRUD ──────────────────────────────────────────
 def create_user(username: str, password: str, role: str = "viewer",
-                must_change_password: bool = True) -> dict:
+                must_change_password: bool = True, sites=None) -> dict:
     if not username or not password:
         return {"error": "username and password required"}
     if role not in VALID_ROLES:
@@ -80,11 +80,40 @@ def create_user(username: str, password: str, role: str = "viewer",
         "username": username,
         "password_hash": hash_password(password),
         "role": role,
+        "sites": list(sites or []),          # allowed site ids (viewers); admins see all
         "must_change_password": bool(must_change_password),
         "created_at": datetime.now(timezone.utc),
     })
-    return {"username": username, "role": role,
+    return {"username": username, "role": role, "sites": list(sites or []),
             "must_change_password": bool(must_change_password)}
+
+
+def get_user_sites(username: str):
+    """Allowed site ids for a viewer (list). Empty = none. Admins are unrestricted."""
+    user = _db["users"].find_one({"username": username})
+    return list(user.get("sites", [])) if user else []
+
+
+def set_user_sites(username: str, sites) -> dict:
+    res = _db["users"].update_one(
+        {"username": username}, {"$set": {"sites": list(sites or [])}})
+    if res.matched_count == 0:
+        return {"error": "user not found"}
+    return {"ok": True, "sites": list(sites or [])}
+
+
+def set_user_role(username: str, role: str) -> dict:
+    if role not in VALID_ROLES:
+        return {"error": f"role must be one of {VALID_ROLES}"}
+    # Don't allow demoting the last admin.
+    if role != "admin":
+        cur = _db["users"].find_one({"username": username})
+        if cur and cur.get("role") == "admin" and _db["users"].count_documents({"role": "admin"}) <= 1:
+            return {"error": "cannot demote the last admin"}
+    res = _db["users"].update_one({"username": username}, {"$set": {"role": role}})
+    if res.matched_count == 0:
+        return {"error": "user not found"}
+    return {"ok": True, "role": role}
 
 
 def authenticate(username: str, password: str) -> Optional[dict]:
@@ -105,6 +134,7 @@ def get_user(username: str) -> Optional[dict]:
     return {
         "username": user["username"],
         "role": user.get("role", "viewer"),
+        "sites": list(user.get("sites", [])),
         "must_change_password": bool(user.get("must_change_password", False)),
     }
 

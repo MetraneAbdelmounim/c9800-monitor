@@ -1,93 +1,115 @@
-﻿<div class="page">
+<div class="page">
   <div class="page-header">
-    <h1>Dashboard</h1>
-    <span class="status-badge" *ngIf="data">
-      <span class="dot" [style.background]="data.health.status === 'connected' || data.health.status === 'demo' ? '#34C759' : '#C8102E'"></span>
-      {{ data.health.status | uppercase }}
+    <div>
+      <h1>Dashboard</h1>
+      <p class="subtitle" *ngIf="data()">{{ data()!.system.hostname }}<span *ngIf="data()!.system.version"> · {{ data()!.system.version }}</span></p>
+    </div>
+    <span class="status-badge" *ngIf="data() as d">
+      <span class="dot" [style.background]="d.health.status === 'connected' || d.health.status === 'demo' ? '#34C759' : '#C8102E'"></span>
+      {{ d.health.status | uppercase }}
     </span>
   </div>
 
-  <div class="error" *ngIf="error">{{ error }}</div>
+  <div class="error" *ngIf="error()">{{ error() }}</div>
+  <app-spinner *ngIf="!data() && !error()" label="Loading dashboard…"></app-spinner>
 
-  <app-spinner *ngIf="!data && !error" label="Loading dashboard…"></app-spinner>
+  <div *ngIf="data() as d" class="content">
 
-  <div *ngIf="data" class="content">
+    <!-- KPI strip (clickable) -->
     <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">HOSTNAME</div>
-        <div class="kpi-value red">{{ data.system.hostname }}</div>
-        <div class="kpi-sub">v{{ data.system.version }}</div>
+      <a class="kpi" routerLink="/access-points">
+        <div class="kpi-icon">▲</div>
+        <div class="kpi-main"><span class="kpi-val">{{ apsOnline() }}</span><span class="kpi-of">/ {{ apsTotal() }}</span></div>
+        <div class="kpi-lbl">Access Points online</div>
+      </a>
+      <a class="kpi" routerLink="/clients">
+        <div class="kpi-icon">○</div>
+        <div class="kpi-main"><span class="kpi-val">{{ clients() }}</span></div>
+        <div class="kpi-lbl">Wireless clients</div>
+      </a>
+      <a class="kpi" routerLink="/wlans">
+        <div class="kpi-icon">◉</div>
+        <div class="kpi-main"><span class="kpi-val">{{ wlans() }}</span></div>
+        <div class="kpi-lbl">WLANs active</div>
+      </a>
+      <a class="kpi" routerLink="/advisor">
+        <div class="kpi-icon">💡</div>
+        <div class="kpi-main"><span class="kpi-val" [class.warn]="criticalFindings() > 0">{{ findings() }}</span></div>
+        <div class="kpi-lbl">Advisor findings</div>
+      </a>
+      <div class="kpi">
+        <div class="kpi-icon">▥</div>
+        <div class="kpi-main"><span class="kpi-val" [style.color]="gaugeColor(cpu())">{{ cpu() }}%</span></div>
+        <div class="kpi-lbl">Controller CPU</div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-label">ACCESS POINTS</div>
-        <div class="kpi-value green">{{ data.aps.total_aps }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">WIRELESS CLIENTS</div>
-        <div class="kpi-value blue">{{ data.clients.total_clients }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">SSIDs ACTIVE</div>
-        <div class="kpi-value purple">{{ data.wlans.total_wlans }}</div>
+      <div class="kpi">
+        <div class="kpi-icon">▦</div>
+        <div class="kpi-main"><span class="kpi-val" [style.color]="gaugeColor(mem())">{{ mem() }}%</span></div>
+        <div class="kpi-lbl">Controller memory</div>
       </div>
     </div>
 
-    <div class="gauge-row">
+    <!-- Headline charts -->
+    <div class="charts-row">
       <div class="card">
-        <div class="card-title">CPU Utilization</div>
-        <div class="gauges">
-          <div class="gauge-item" *ngFor="let g of [
-            {val: data.cpu.five_seconds, label: '5 sec'},
-            {val: data.cpu.one_minute, label: '1 min'},
-            {val: data.cpu.five_minutes, label: '5 min'}
-          ]">
+        <div class="card-title">Client Signal Quality</div>
+        <div class="chart-h" *ngIf="hasClients(); else noClients">
+          <app-chart type="doughnut" [data]="qualityData()"></app-chart>
+        </div>
+        <ng-template #noClients><div class="empty-mini">No clients connected.</div></ng-template>
+      </div>
+      <div class="card">
+        <div class="card-title">Clients by Band</div>
+        <div class="chart-h" *ngIf="hasClients(); else noClients2">
+          <app-chart type="doughnut" [data]="bandData()"></app-chart>
+        </div>
+        <ng-template #noClients2><div class="empty-mini">No clients connected.</div></ng-template>
+      </div>
+      <div class="card">
+        <div class="card-title">Access Point Status</div>
+        <div class="chart-h">
+          <app-chart type="doughnut" [data]="apStatusData()"></app-chart>
+        </div>
+      </div>
+    </div>
+
+    <!-- System + Top findings -->
+    <div class="bottom-row">
+      <div class="card system-card">
+        <div class="card-title">Controller Resources</div>
+        <div class="sys-grid">
+          <div class="gauge">
             <svg viewBox="0 0 100 90" class="gauge-svg">
-              <circle class="gauge-track" cx="50" cy="50" r="38" fill="none" stroke-width="7"
+              <circle class="gauge-track" cx="50" cy="50" r="38" fill="none" stroke-width="8"
                 stroke-dasharray="179 239" stroke-linecap="round" transform="rotate(135 50 50)"/>
-              <circle cx="50" cy="50" r="38" fill="none" [attr.stroke]="gaugeColor(g.val)" stroke-width="7"
-                [attr.stroke-dasharray]="(179 * g.val / 100) + ' 239'" stroke-linecap="round" transform="rotate(135 50 50)"/>
-              <text class="gauge-text" x="50" y="52" text-anchor="middle" font-size="18" font-weight="700"
-                font-family="JetBrains Mono, monospace">{{ g.val }}%</text>
+              <circle cx="50" cy="50" r="38" fill="none" [attr.stroke]="gaugeColor(cpu())" stroke-width="8"
+                [attr.stroke-dasharray]="(179 * cpu() / 100) + ' 239'" stroke-linecap="round" transform="rotate(135 50 50)"/>
+              <text x="50" y="52" text-anchor="middle" font-size="19" font-weight="800"
+                fill="var(--text-1)" font-family="JetBrains Mono, monospace">{{ cpu() }}%</text>
             </svg>
-            <div class="gauge-label">{{ g.label }}</div>
+            <div class="gauge-lbl">CPU</div>
+          </div>
+          <div class="mem-bars">
+            <div *ngFor="let pool of d.memory.pools" class="mem-item">
+              <div class="mem-header"><span>{{ pool.name }}</span><span class="mono">{{ pool.used_percent }}%</span></div>
+              <div class="mem-bar-bg"><div class="mem-bar-fill" [style.width.%]="pool.used_percent" [style.background]="gaugeColor(pool.used_percent)"></div></div>
+              <div class="mem-detail" *ngIf="pool.total_mb">{{ pool.used_mb }} / {{ pool.total_mb }} MB</div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">Memory</div>
-        <div class="mem-bars">
-          <div *ngFor="let pool of data.memory.pools" class="mem-item">
-            <div class="mem-header">
-              <span>{{ pool.name }}</span>
-              <span class="mono">{{ pool.used_percent }}%</span>
-            </div>
-            <div class="mem-bar-bg">
-              <div class="mem-bar-fill" [style.width.%]="pool.used_percent"
-                   [style.background]="gaugeColor(pool.used_percent)"></div>
-            </div>
-            <div class="mem-detail" *ngIf="pool.total_mb">{{ pool.used_mb }} / {{ pool.total_mb }} MB</div>
-          </div>
+
+      <div class="card findings-card">
+        <div class="card-title">Top Findings <a class="card-link" routerLink="/advisor">View all →</a></div>
+        <div class="findings" *ngIf="topFindings().length; else allGood">
+          <a class="finding" routerLink="/advisor" *ngFor="let f of topFindings()">
+            <span class="sev" [class]="f.severity">{{ f.severity }}</span>
+            <span class="f-title">{{ f.title }}<span class="f-count" *ngIf="f.count"> ({{ f.count }})</span></span>
+          </a>
         </div>
-      </div>
-      <div class="card">
-        <div class="card-title">Client Distribution</div>
-        <div class="band-bars">
-          <div class="band-item">
-            <div class="band-header"><span>5 GHz</span><span class="mono">{{ data.clients.clients_5ghz }}</span></div>
-            <div class="band-bar-bg"><div class="band-bar-fill" style="background: #C8102E"
-              [style.width.%]="data.clients.total_clients ? (data.clients.clients_5ghz / data.clients.total_clients * 100) : 0"></div></div>
-          </div>
-          <div class="band-item">
-            <div class="band-header"><span>2.4 GHz</span><span class="mono">{{ data.clients.clients_2ghz }}</span></div>
-            <div class="band-bar-bg"><div class="band-bar-fill" style="background: #E8A838"
-              [style.width.%]="data.clients.total_clients ? (data.clients.clients_2ghz / data.clients.total_clients * 100) : 0"></div></div>
-          </div>
-          <div class="band-item">
-            <div class="band-header"><span>6 GHz</span><span class="mono">{{ data.clients.clients_6ghz }}</span></div>
-            <div class="band-bar-bg"><div class="band-bar-fill" style="background: #9B72CF"
-              [style.width.%]="data.clients.total_clients ? (data.clients.clients_6ghz / data.clients.total_clients * 100) : 0"></div></div>
-          </div>
-        </div>
+        <ng-template #allGood>
+          <div class="all-good">✓ No issues detected — network is healthy.</div>
+        </ng-template>
       </div>
     </div>
   </div>

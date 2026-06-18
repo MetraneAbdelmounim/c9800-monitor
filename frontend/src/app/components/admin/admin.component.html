@@ -57,6 +57,17 @@
           </select>
         </label>
 
+        <div class="field" *ngIf="newRole === 'viewer'">
+          <span class="field-label">Allowed sites</span>
+          <div class="site-checks" *ngIf="allSites().length; else noSites">
+            <label class="chk" *ngFor="let s of allSites()">
+              <input type="checkbox" [checked]="isNewSite(s.id)" (change)="toggleNewSite(s.id)" /> {{ s.name }}
+            </label>
+          </div>
+          <ng-template #noSites><span class="dim">No sites yet — add them under Sites.</span></ng-template>
+          <span class="hint">Admins always see all sites.</span>
+        </div>
+
         <div class="msg error"   *ngIf="createError()">{{ createError() }}</div>
         <div class="msg success" *ngIf="createSuccess()">{{ createSuccess() }}</div>
 
@@ -81,7 +92,7 @@
         <tr>
           <th>Username</th>
           <th>Role</th>
-          <th>Created</th>
+          <th>Sites</th>
           <th class="actions-col"></th>
         </tr>
       </thead>
@@ -92,7 +103,27 @@
             <span class="self-tag" *ngIf="isSelf(u)">you</span>
           </td>
           <td><span class="role-pill" [class.admin]="u.role === 'admin'">{{ u.role }}</span></td>
-          <td class="dim">{{ u.created_at || '—' }}</td>
+          <td class="sites-cell">
+            <span *ngIf="u.role === 'admin'" class="dim">All sites</span>
+            <ng-container *ngIf="u.role === 'viewer'">
+              <ng-container *ngIf="editUser !== u.username">
+                <span *ngIf="(u.sites || []).length; else noneAssigned">
+                  <span class="site-tag" *ngFor="let id of u.sites">{{ siteName(id) }}</span>
+                </span>
+                <ng-template #noneAssigned><span class="dim">none</span></ng-template>
+                <button class="link" (click)="startEditSites(u)">edit</button>
+              </ng-container>
+              <div class="site-edit" *ngIf="editUser === u.username">
+                <label class="chk" *ngFor="let s of allSites()">
+                  <input type="checkbox" [checked]="isEditSite(s.id)" (change)="toggleEditSite(s.id)" /> {{ s.name }}
+                </label>
+                <div class="edit-actions">
+                  <button class="link" (click)="saveEditSites()">save</button>
+                  <button class="link" (click)="cancelEditSites()">cancel</button>
+                </div>
+              </div>
+            </ng-container>
+          </td>
           <td class="actions-col">
             <button class="btn-delete"
                     (click)="deleteUser(u)"
@@ -103,7 +134,7 @@
           </td>
         </tr>
         <tr *ngIf="!loading() && users().length === 0">
-          <td colspan="4" class="empty">No users.</td>
+          <td colspan="5" class="empty">No users.</td>
         </tr>
       </tbody>
     </table>

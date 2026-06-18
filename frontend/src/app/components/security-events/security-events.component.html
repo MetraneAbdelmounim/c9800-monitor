@@ -5,6 +5,10 @@
       <p class="subtitle">Security, RF &amp; client anomalies detected from the controller</p>
     </div>
     <div class="head-right" *ngIf="data as d">
+      <div class="wm-view-toggle">
+        <button [class.on]="view === 'list'" (click)="view = 'list'" title="List view">☰ List</button>
+        <button [class.on]="view === 'charts'" (click)="view = 'charts'" title="Charts view">▦ Charts</button>
+      </div>
       <button class="toggle" [class.on]="showAcked" (click)="toggleShowAcked()">👁 Show Acked</button>
       <span class="counts">{{ d.unacked }} unacked · {{ d.acked }} acked</span>
     </div>
@@ -15,6 +19,30 @@
   <app-spinner *ngIf="!data && !error" label="Loading events…"></app-spinner>
 
   <ng-container *ngIf="data as d">
+
+    <!-- ── Charts view ─────────────────────────────── -->
+    <div class="wm-charts-grid" *ngIf="view === 'charts' && d.events.length">
+      <div class="wm-chart-card">
+        <div class="wm-chart-title">By Severity</div>
+        <div class="wm-chart-body"><app-chart type="doughnut" [data]="severityData"></app-chart></div>
+      </div>
+      <div class="wm-chart-card">
+        <div class="wm-chart-title">By Category</div>
+        <div class="wm-chart-body"><app-chart type="doughnut" [data]="categoryData"></app-chart></div>
+      </div>
+      <div class="wm-chart-card">
+        <div class="wm-chart-title">Top Event Types</div>
+        <div class="wm-chart-body"><app-chart type="bar" [data]="typeData" [options]="barOptions"></app-chart></div>
+      </div>
+    </div>
+    <div class="empty-state" *ngIf="view === 'charts' && !d.events.length">
+      <div class="empty-icon">✓</div>
+      <div class="empty-title">{{ showAcked ? 'No events' : 'No unacknowledged events' }}</div>
+      <p>Nothing to chart right now.</p>
+    </div>
+
+    <!-- ── List view ───────────────────────────────── -->
+    <ng-container *ngIf="view === 'list'">
     <!-- Action bar -->
     <div class="action-bar" *ngIf="d.events.length">
       <label class="sel-all">
@@ -59,5 +87,6 @@
         <span class="ev-score">Score {{ e.score }}</span>
       </div>
     </div>
+    </ng-container>
   </ng-container>
 </div>

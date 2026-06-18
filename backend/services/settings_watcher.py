@@ -26,11 +26,15 @@ class SettingsWatcher(threading.Thread):
         self._sig = self._signature()
 
     def _signature(self):
-        """A cheap fingerprint of the settings that affect the live client."""
+        """A cheap fingerprint of the settings + sites that affect live clients."""
         try:
             wlc = self._db["settings"].find_one({"_id": "wlc"}, {"updated_at": 1}) or {}
             sysd = self._db["settings"].find_one({"_id": "system"}, {"updated_at": 1, "demo_mode": 1}) or {}
-            return (str(wlc.get("updated_at")), str(sysd.get("updated_at")), sysd.get("demo_mode"))
+            # Sites: rebuild when any site is added/edited/removed.
+            scount = self._db["sites"].count_documents({})
+            slatest = self._db["sites"].find_one(sort=[("updated_at", -1)], projection={"updated_at": 1}) or {}
+            sites_sig = (scount, str(slatest.get("updated_at")))
+            return (str(wlc.get("updated_at")), str(sysd.get("updated_at")), sysd.get("demo_mode"), sites_sig)
         except Exception as e:
             log.warning(f"settings signature read failed: {e}")
             return self._sig

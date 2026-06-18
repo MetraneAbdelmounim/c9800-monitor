@@ -143,3 +143,17 @@ tr:hover td { background: var(--bg-hover); }
   color: var(--brand-light);
 }
 .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Per-site assignment */
+.site-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }
+.chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2);
+  font-weight: 500; cursor: pointer; }
+.hint { display: block; font-size: 11px; color: var(--text-3); margin-top: 6px; }
+.sites-cell { max-width: 360px; }
+.site-tag { display: inline-block; font-size: 11px; background: var(--bg-hover); color: var(--text-2);
+  padding: 2px 8px; border-radius: 10px; margin: 2px 4px 2px 0; }
+.site-edit { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.edit-actions { display: flex; gap: 10px; width: 100%; margin-top: 6px; }
+.link { background: none; border: none; color: var(--brand-light); font-size: 12px; font-weight: 600;
+  cursor: pointer; padding: 2px 4px; }
+.link:hover { text-decoration: underline; }

@@ -13,6 +13,12 @@
         <span class="brand-name">WireMetry</span>
       </div>
       <div class="logo-sub">Wireless Intelligence</div>
+      <div class="site-switch" *ngIf="siteCtx.sites().length">
+        <span class="site-ic">🏢</span>
+        <select [ngModel]="siteCtx.currentId()" (ngModelChange)="onSiteChange($event)" title="Active site">
+          <option *ngFor="let s of siteCtx.sites()" [value]="s.id">{{ s.name }}</option>
+        </select>
+      </div>
     </div>
     <div class="nav-items">
       <div class="nav-section">MONITORING</div>

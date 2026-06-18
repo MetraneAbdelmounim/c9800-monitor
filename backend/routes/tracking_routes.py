@@ -8,12 +8,21 @@ from datetime import datetime, timezone, timedelta
 from bson import json_util
 import json
 
+from services.access import resolve_site
+
 tracking_bp = Blueprint("tracking", __name__)
 _db = None
 
 def init_tracking(mongo_db):
     global _db
     _db = mongo_db
+
+def _site_q():
+    """Mongo filter limiting to the resolved site. Enforces per-site access:
+    viewers are scoped to an allowed site even if no ?site= is given; admins with
+    no ?site= get all sites ({})."""
+    s = resolve_site(request.args.get("site"))
+    return {"site_id": s} if s else {}
 
 def _parse_range(range_str):
     now = datetime.now(timezone.utc)
@@ -101,7 +110,7 @@ def tracked_clients():
     """List unique tracked clients (last 24h only for performance)."""
     since = datetime.now(timezone.utc) - timedelta(hours=24)
     pipe = [
-        {"$match": {"timestamp": {"$gte": since}}},
+        {"$match": {**_site_q(), "timestamp": {"$gte": since}}},
         {"$sort": {"timestamp": -1}},
         {"$group": {
             "_id": "$mac", "mac": {"$first": "$mac"},
@@ -132,7 +141,7 @@ def client_timeline(mac):
 
     max_points = 500
     docs = list(_db[coll].find(
-        {"mac": mac.lower(), "timestamp": {"$gte": since}},
+        {"mac": mac.lower(), "timestamp": {"$gte": since}, **_site_q()},
         {"_id": 0, "timestamp": 1, "rssi_dbm": 1, "snr_db": 1,
          "quality_score": 1, "quality_label": 1, "data_rate_mbps": 1,
          "ap_name": 1, "ssid": 1, "band": 1, "channel": 1,
@@ -156,7 +165,7 @@ def client_roaming(mac):
     time_range = request.args.get("range", "last24h")
     since = _parse_range(time_range)
     docs = list(_db["roaming_events"].find(
-        {"mac": mac.lower(), "timestamp": {"$gte": since}}, {"_id": 0}
+        {"mac": mac.lower(), "timestamp": {"$gte": since}, **_site_q()}, {"_id": 0}
     ).sort("timestamp", 1).limit(200))
     return jsonify({"mac": mac, "range": time_range, "count": len(docs),
                      "events": _serialize(docs)})
@@ -167,7 +176,7 @@ def client_summary(mac):
     since = _parse_range(time_range)
     coll = _collection_for_range(time_range)
     pipe = [
-        {"$match": {"mac": mac.lower(), "timestamp": {"$gte": since}}},
+        {"$match": {"mac": mac.lower(), "timestamp": {"$gte": since}, **_site_q()}},
         {"$group": {
             "_id": None, "count": {"$sum": 1},
             "avg_rssi": {"$avg": "$rssi_dbm"}, "min_rssi": {"$min": "$rssi_dbm"}, "max_rssi": {"$max": "$rssi_dbm"},
@@ -199,7 +208,7 @@ def all_roaming():
     time_range = request.args.get("range", "last2h")
     since = _parse_range(time_range)
     docs = list(_db["roaming_events"].find(
-        {"timestamp": {"$gte": since}}, {"_id": 0}
+        {"timestamp": {"$gte": since}, **_site_q()}, {"_id": 0}
     ).sort("timestamp", -1).limit(200))
     return jsonify({"range": time_range, "count": len(docs), "events": _serialize(docs)})
 
@@ -208,7 +217,7 @@ def ap_load_history(ap_name):
     time_range = request.args.get("range", "last2h")
     since = _parse_range(time_range)
     docs = list(_db["ap_load_history"].find(
-        {"ap_name": ap_name, "timestamp": {"$gte": since}}, {"_id": 0}
+        {"ap_name": ap_name, "timestamp": {"$gte": since}, **_site_q()}, {"_id": 0}
     ).sort("timestamp", 1).limit(500))
     return jsonify({"ap_name": ap_name, "range": time_range,
                      "count": len(docs), "history": _serialize(docs)})
@@ -220,7 +229,7 @@ def roaming_graph():
     mac_filter = request.args.get("mac", "").strip().lower()
     since = _parse_range(time_range)
 
-    match = {"timestamp": {"$gte": since}}
+    match = {"timestamp": {"$gte": since}, **_site_q()}
     if mac_filter:
         match["mac"] = {"$regex": mac_filter, "$options": "i"}
 
@@ -255,7 +264,7 @@ def roaming_graph():
         now = datetime.now(timezone.utc)
         snap_since = now - timedelta(minutes=3)
         ap_stats_pipe = [
-            {"$match": {"timestamp": {"$gte": snap_since}}},
+            {"$match": {"timestamp": {"$gte": snap_since}, **_site_q()}},
             {"$sort": {"timestamp": -1}},
             {"$group": {                       # latest snapshot per client
                 "_id": "$mac",
@@ -312,7 +321,7 @@ def trends():
     since = _parse_range(time_range)
 
     sys_docs = list(_db["system_metrics"].find(
-        {"timestamp": {"$gte": since}},
+        {"timestamp": {"$gte": since}, **_site_q()},
         {"_id": 0, "timestamp": 1, "total_clients": 1, "clients_2g": 1,
          "clients_5g": 1, "clients_6g": 1, "cpu_5s": 1, "mem_used_pct": 1, "total_aps": 1},
     ).sort("timestamp", 1))
@@ -323,7 +332,7 @@ def trends():
 
     try:
         top = list(_db["ap_load_history"].aggregate([
-            {"$match": {"timestamp": {"$gte": since}}},
+            {"$match": {"timestamp": {"$gte": since}, **_site_q()}},
             {"$group": {"_id": "$ap_name",
                         "avg_clients": {"$avg": "$client_count"},
                         "max_clients": {"$max": "$client_count"}}},
@@ -333,7 +342,7 @@ def trends():
                     "max_clients": t["max_clients"]} for t in top if t["_id"]]
 
         hourly = list(_db["system_metrics"].aggregate([
-            {"$match": {"timestamp": {"$gte": since}}},
+            {"$match": {"timestamp": {"$gte": since}, **_site_q()}},
             {"$group": {"_id": {"$hour": "$timestamp"}, "avg_clients": {"$avg": "$total_clients"}}},
             {"$sort": {"_id": 1}},
         ]))

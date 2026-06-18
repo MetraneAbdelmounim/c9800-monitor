@@ -4,6 +4,7 @@ acknowledging requires auth (any signed-in user).
 """
 from flask import Blueprint, request, jsonify, g
 from services.auth import require_auth
+from services.access import resolve_site
 
 events_bp = Blueprint("events", __name__, url_prefix="/api/events")
 _engine = None
@@ -20,7 +21,8 @@ def list_events():
     if not _engine:
         return jsonify({"events": [], "unacked": 0, "acked": 0})
     show_acked = request.args.get("show_acked", "false").lower() in ("1", "true", "yes")
-    return jsonify(_engine.list_events(show_acked=show_acked))
+    site = resolve_site(request.args.get("site") or None)   # enforces per-site access
+    return jsonify(_engine.list_events(show_acked=show_acked, site_id=site))
 
 
 @events_bp.route("/ack", methods=["POST"])

@@ -1,0 +1,139 @@
+<div class="reports-page">
+  <!-- Toolbar (not printed) -->
+  <div class="rp-toolbar no-print">
+    <div>
+      <h1>Reports</h1>
+      <p class="sub">Network health report — export as PDF for your client</p>
+    </div>
+    <div class="rp-actions">
+      <button class="btn ghost" (click)="generate()" [disabled]="loading()">↻ Regenerate</button>
+      <button class="btn primary" (click)="download()" [disabled]="loading()">⤓ Download PDF</button>
+    </div>
+  </div>
+
+  <app-spinner *ngIf="loading()" label="Building report…"></app-spinner>
+  <div class="error-banner no-print" *ngIf="error()">{{ error() }}</div>
+
+  <!-- ── Printable report surface ──────────────────────── -->
+  <div class="report" *ngIf="!loading()">
+
+    <!-- Cover / header -->
+    <header class="rp-head">
+      <div class="rp-brand">
+        <svg width="34" height="34" viewBox="0 0 36 36" aria-hidden="true">
+          <rect width="36" height="36" rx="9" fill="#1B3A6B"/>
+          <g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round">
+            <path d="M9.5 16.5a12 12 0 0 1 17 0"/><path d="M13.5 20.5a6.5 6.5 0 0 1 9 0"/>
+          </g>
+          <circle cx="18" cy="25" r="2.1" fill="#C8102E"/>
+        </svg>
+        <span class="rp-name">Wire<span>Metry</span></span>
+      </div>
+      <div class="rp-meta">
+        <div *ngIf="customer"><b>{{ customer }}</b></div>
+        <div class="site" *ngIf="siteName">🏢 {{ siteName }}<span *ngIf="siteLocation"> · {{ siteLocation }}</span></div>
+        <div class="dim">Generated {{ generatedAt() }}</div>
+      </div>
+    </header>
+    <div class="rp-stripe"></div>
+    <div class="rp-title">
+      <h2>Network Health Report</h2>
+      <div class="dim">
+        <span *ngIf="siteName"><b>{{ siteName }}</b> — </span>{{ dash()?.system?.hostname || 'Wireless Controller' }}<span *ngIf="dash()?.system?.version"> · {{ dash()?.system?.version }}</span>
+      </div>
+    </div>
+
+    <!-- Executive summary -->
+    <section class="rp-section">
+      <div class="rp-section-title">Executive Summary</div>
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-val">{{ apsOnline() }}<span class="kpi-of">/ {{ apsTotal() }}</span></div><div class="kpi-lbl">Access Points online</div></div>
+        <div class="kpi"><div class="kpi-val">{{ clients() }}</div><div class="kpi-lbl">Connected clients</div></div>
+        <div class="kpi"><div class="kpi-val">{{ wlans() }}</div><div class="kpi-lbl">WLANs</div></div>
+        <div class="kpi"><div class="kpi-val" [class.warn]="alerts()>0">{{ alerts() }}</div><div class="kpi-lbl">Active alerts</div></div>
+        <div class="kpi"><div class="kpi-val">{{ cpu() }}%</div><div class="kpi-lbl">Controller CPU</div></div>
+        <div class="kpi"><div class="kpi-val">{{ mem() }}%</div><div class="kpi-lbl">Controller memory</div></div>
+        <div class="kpi" *ngIf="compliance() !== null"><div class="kpi-val">{{ compliance() }}%</div><div class="kpi-lbl">Firmware compliant</div></div>
+        <div class="kpi" *ngIf="poorClients()>0"><div class="kpi-val warn">{{ poorClients() }}</div><div class="kpi-lbl">Clients poor signal</div></div>
+      </div>
+    </section>
+
+    <!-- Client health -->
+    <section class="rp-section" *ngIf="hasClients()">
+      <div class="rp-section-title">Client Health
+        <span class="rp-note" *ngIf="avgRssi() !== null">Avg RSSI {{ avgRssi() }} dBm · Avg SNR {{ avgSnr() }} dB</span>
+      </div>
+      <div class="rp-charts">
+        <div class="rp-chart">
+          <div class="rp-chart-t">Signal Quality</div>
+          <div class="rp-chart-b"><app-chart type="doughnut" [data]="qualityData()" [options]="donutOpts"></app-chart></div>
+        </div>
+        <div class="rp-chart">
+          <div class="rp-chart-t">Clients by Band</div>
+          <div class="rp-chart-b"><app-chart type="doughnut" [data]="bandData()" [options]="donutOpts"></app-chart></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AP health -->
+    <section class="rp-section">
+      <div class="rp-section-title">Access Point Health</div>
+      <div class="rp-charts">
+        <div class="rp-chart">
+          <div class="rp-chart-t">AP Status</div>
+          <div class="rp-chart-b"><app-chart type="doughnut" [data]="apStatusData()" [options]="donutOpts"></app-chart></div>
+        </div>
+        <div class="rp-chart">
+          <div class="rp-chart-t">APs by Model</div>
+          <div class="rp-chart-b"><app-chart type="bar" [data]="apModelData()" [options]="barOpts"></app-chart></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Security & events -->
+    <section class="rp-section" *ngIf="hasEvents()">
+      <div class="rp-section-title">Security &amp; Events</div>
+      <div class="rp-charts">
+        <div class="rp-chart">
+          <div class="rp-chart-t">Active Alerts by Severity</div>
+          <div class="rp-chart-b"><app-chart type="doughnut" [data]="eventsData()" [options]="donutOpts"></app-chart></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Key findings -->
+    <section class="rp-section" *ngIf="recommendations().length">
+      <div class="rp-section-title">Key Findings &amp; Recommendations</div>
+      <div class="rec" *ngFor="let r of recommendations()">
+        <span class="rec-sev" [class]="r.severity">{{ r.severity }}</span>
+        <div class="rec-body">
+          <div class="rec-title">{{ r.title }}<span class="rec-count" *ngIf="r.count"> ({{ r.count }})</span></div>
+          <div class="rec-detail">{{ r.detail }}</div>
+          <div class="rec-action"><b>Action:</b> {{ r.action }}</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Clients needing attention -->
+    <section class="rp-section" *ngIf="worstClients().length">
+      <div class="rp-section-title">Clients Needing Attention</div>
+      <table class="rp-table">
+        <thead><tr><th>Client</th><th>AP / SSID</th><th>Band</th><th class="num">RSSI</th><th class="num">SNR</th><th class="num">Quality</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let c of worstClients()">
+            <td>{{ c.hostname || c.mac }}</td>
+            <td>{{ c.ap_name || '—' }} <span class="dim">/ {{ c.ssid || '—' }}</span></td>
+            <td>{{ c.band || '—' }}</td>
+            <td class="num">{{ c.rssi_dbm || '—' }}</td>
+            <td class="num">{{ c.snr_db || '—' }}</td>
+            <td class="num">{{ c.quality_score }} · {{ c.quality_label }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <footer class="rp-foot">
+      WireMetry — Wireless Intelligence · Network Health Report · {{ generatedAt() }}
+    </footer>
+  </div>
+</div>

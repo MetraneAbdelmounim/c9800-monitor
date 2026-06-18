@@ -1,0 +1,47 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Sites Overview</h1>
+      <p class="subtitle" *ngIf="data() as d">{{ d.totals.sites_online }} / {{ d.totals.sites }} sites online</p>
+    </div>
+  </div>
+
+  <div class="error" *ngIf="error()">{{ error() }}</div>
+  <app-spinner *ngIf="!data() && !error()" label="Loading overview…"></app-spinner>
+
+  <div *ngIf="data() as d" class="content">
+    <!-- Aggregate totals -->
+    <div class="totals">
+      <div class="t"><div class="t-val">{{ d.totals.online_aps }}<span class="t-of">/ {{ d.totals.total_aps }}</span></div><div class="t-lbl">APs online</div></div>
+      <div class="t"><div class="t-val">{{ d.totals.clients }}</div><div class="t-lbl">Clients</div></div>
+      <div class="t"><div class="t-val">{{ d.totals.sites_online }}<span class="t-of">/ {{ d.totals.sites }}</span></div><div class="t-lbl">Sites online</div></div>
+      <div class="t"><div class="t-val" [class.warn]="d.totals.alerts>0">{{ d.totals.alerts }}</div><div class="t-lbl">Active alerts</div></div>
+    </div>
+
+    <!-- Per-site cards -->
+    <div class="site-grid">
+      <button class="site-card" *ngFor="let s of d.sites" (click)="open(s)" [attr.data-h]="health(s)">
+        <div class="sc-head">
+          <span class="sc-dot" [class]="health(s)"></span>
+          <div class="sc-name">
+            {{ s.name }}
+            <span class="sc-loc" *ngIf="s.location">{{ s.location }}</span>
+          </div>
+          <span class="sc-alerts" *ngIf="s.alerts">{{ s.alerts }} ⚠</span>
+        </div>
+        <div class="sc-body" *ngIf="s.reachable; else offline">
+          <div class="sc-metric"><span class="m-val">{{ s.online_aps }}<span class="m-of">/{{ s.total_aps }}</span></span><span class="m-lbl">APs</span></div>
+          <div class="sc-metric"><span class="m-val">{{ s.clients }}</span><span class="m-lbl">Clients</span></div>
+          <div class="sc-metric"><span class="m-val">{{ s.cpu }}%</span><span class="m-lbl">CPU</span></div>
+          <div class="sc-metric"><span class="m-val">{{ s.mem }}%</span><span class="m-lbl">Mem</span></div>
+        </div>
+        <ng-template #offline><div class="sc-offline">Controller unreachable</div></ng-template>
+        <div class="sc-foot">Open site →</div>
+      </button>
+    </div>
+
+    <div class="empty" *ngIf="!d.sites.length">
+      No sites configured. Go to <b>Admin → Sites</b> to add your controllers.
+    </div>
+  </div>
+</div>

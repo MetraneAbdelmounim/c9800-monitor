@@ -9,7 +9,7 @@ Auth API Routes:
 from flask import Blueprint, request, jsonify, g
 from services.auth import (
     authenticate, create_token, create_user, change_password,
-    require_auth, require_role, get_user,
+    require_auth, require_role, get_user, set_user_role, set_user_sites,
 )
 from services.limiter import limiter
 
@@ -61,10 +61,29 @@ def register():
         username=(data.get("username") or "").strip(),
         password=data.get("password") or "",
         role=data.get("role") or "viewer",
+        sites=data.get("sites") or [],
     )
     if "error" in result:
         return jsonify(result), 400
     return jsonify(result), 201
+
+
+@auth_bp.route("/users/<username>", methods=["PUT"])
+@require_role("admin")
+def update_user(username):
+    """Update a user's role and/or assigned sites (admin only)."""
+    if not get_user(username):
+        return jsonify({"error": "user not found"}), 404
+    data = request.get_json(silent=True) or {}
+    if "role" in data:
+        r = set_user_role(username, data["role"])
+        if "error" in r:
+            return jsonify(r), 400
+    if "sites" in data:
+        s = set_user_sites(username, data["sites"] or [])
+        if "error" in s:
+            return jsonify(s), 400
+    return jsonify(get_user(username))
 
 
 @auth_bp.route("/users", methods=["GET"])

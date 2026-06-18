@@ -273,3 +273,23 @@ export interface AdvisorResult {
   recommendations: Recommendation[];
   generated_at: string;
 }
+
+// ── Sites (multisite) ──────────────────────────────────
+export interface Site {
+  id: string;
+  name: string;
+  location: string;
+  host: string;
+  port: number;
+  username: string;
+  verify_ssl: boolean;
+  enabled: boolean;
+  password_set: boolean;
+  updated_at?: string;
+  updated_by?: string;
+}
+export interface SiteList {
+  sites: Site[];
+  count: number;
+  max_sites: number | null;   // null = unlimited
+}

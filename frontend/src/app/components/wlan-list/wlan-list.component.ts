@@ -5,6 +5,9 @@ import { WlcService } from '../../services/wlc.service';
 import { Wlan } from '../../models/models';
 import { PaginatorComponent } from '../paginator/paginator.component';
 import { SpinnerComponent } from '../spinner/spinner.component';
+import { ChartComponent } from '../chart/chart.component';
+
+const WLAN_PALETTE = ['#3E6BB0', '#5A9BD5', '#9B72CF', '#34C759', '#E8A838', '#E07830', '#C8102E', '#6E97D6'];
 
 type SortKey = keyof Pick<Wlan,
   'wlan_id' | 'profile_name' | 'ssid' | 'status' | 'band_str' | 'security' | 'policy_tag'>;
@@ -13,7 +16,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-wlan-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, PaginatorComponent, SpinnerComponent],
+  imports: [CommonModule, FormsModule, PaginatorComponent, SpinnerComponent, ChartComponent],
   templateUrl: './wlan-list.component.html',
   styleUrl: './wlan-list.component.css',
 })
@@ -22,6 +25,8 @@ export class WlanListComponent implements OnInit {
   total = signal(0);
   loading = signal(true);
   error = signal<string | null>(null);
+
+  view = signal<'list' | 'charts'>('list');
 
   search = signal('');
   filterStatus = signal('');
@@ -74,11 +79,37 @@ export class WlanListComponent implements OnInit {
     return list.slice((p - 1) * s, p * s);
   });
 
+  // ── Chart data ──
+  readonly statusData = computed(() => {
+    const en = this.filtered().filter(w => (w.status || '').toLowerCase() === 'enabled').length;
+    return {
+      labels: ['Enabled', 'Disabled'],
+      datasets: [{ data: [en, this.filtered().length - en],
+        backgroundColor: ['#34C759', '#706868'], borderWidth: 0 }],
+    };
+  });
+  readonly securityData = computed(() => this.donut(w => w.security));
+  readonly bandData = computed(() => this.donut(w => w.band_str));
+
   constructor(private wlc: WlcService) {
     effect(() => {
       this.search(); this.filterStatus(); this.filterSecurity(); this.filterBand();
       this.page.set(1);
     });
+  }
+
+  private donut(pick: (w: Wlan) => string) {
+    const m = new Map<string, number>();
+    for (const w of this.filtered()) {
+      const k = (pick(w) || 'Unknown').trim();
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    const labels = [...m.keys()];
+    return {
+      labels,
+      datasets: [{ data: labels.map(l => m.get(l)),
+        backgroundColor: labels.map((_, i) => WLAN_PALETTE[i % WLAN_PALETTE.length]), borderWidth: 0 }],
+    };
   }
 
   ngOnInit() { this.load(); }

@@ -29,8 +29,11 @@ from routes.tracking_routes import tracking_bp, init_tracking
 from routes.map_routes import map_bp, init_map
 from routes.event_routes import events_bp, register_engine
 from routes.license_routes import license_bp
+from routes.site_routes import sites_bp
 from services.limiter import limiter
 from services.licensing import init_license, is_licensed
+from services.sites import init_sites, migrate_legacy, get_enabled_sites
+from services.site_manager import SiteManager
 
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s %(message)s")
@@ -76,6 +79,8 @@ init_auth(mongo_db)
 bootstrap_admin(BOOTSTRAP_ADMIN_USER, BOOTSTRAP_ADMIN_PASS)
 init_settings(mongo_db)
 init_license(mongo_db)   # load stored license (or auto-activate from LICENSE_KEY)
+init_sites(mongo_db)
+migrate_legacy(get_wlc_settings)   # seed first site from the existing controller
 
 
 # ── License lock gate ──────────────────────────────────
@@ -100,8 +105,7 @@ def _license_gate():
     return None
 
 
-# ── Live WLC client (vendor-selectable, demo override wins) ─
-client = None
+# ── Live WLC clients — one per enabled site (vendor is global) ─
 collector = None
 event_engine = None
 settings_watcher = None
@@ -112,35 +116,32 @@ def effective_demo_mode() -> bool:
     return override if override is not None else DEMO_MODE
 
 
-def _build_real_client():
-    s = get_wlc_settings()
-    vendor = (s.get("vendor") or "cisco").lower()
-    log.info(f"Connecting to {vendor} WLC {s['host']}:{s['port']} (source={s.get('source','config')})")
-    if vendor == "ruckus":
-        from services.ruckus_client import RuckusClient
-        return RuckusClient(s["host"], s["port"], s["username"], s["password"], s["verify_ssl"])
-    return C9800RestconfClient(s["host"], s["port"], s["username"], s["password"], s["verify_ssl"])
-
-
-def _build_client():
+def _build_site_client(site):
+    """Build a live client for one site. Demo override wins; vendor is global."""
     if effective_demo_mode():
         from services.demo_client import DemoClient
-        log.info("Live client: DemoClient (simulated data)")
         return DemoClient()
-    return _build_real_client()
+    vendor = (get_wlc_settings().get("vendor") or "cisco").lower()
+    if vendor == "ruckus":
+        from services.ruckus_client import RuckusClient
+        return RuckusClient(site["host"], site["port"], site["username"], site["password"], site["verify_ssl"])
+    return C9800RestconfClient(site["host"], site["port"], site["username"], site["password"], site["verify_ssl"])
 
 
-client = _build_client()
+def _list_enabled_sites():
+    sites = get_enabled_sites()
+    if not sites and effective_demo_mode():
+        sites = [{"id": "demo", "name": "Demo", "location": "", "host": "", "port": 0,
+                  "username": "", "password": "", "verify_ssl": False}]
+    return sites
+
+
+site_manager = SiteManager(_list_enabled_sites, _build_site_client)
 
 
 def swap_wlc_client():
-    """Re-instantiate the live client (demo or real) and rewire dependents."""
-    global client
-    client = _build_client()
-    if collector is not None:
-        collector.rc = client
-    if event_engine is not None:
-        event_engine.rc = client
+    """Rebuild every site's client (sites / credentials / demo changed)."""
+    site_manager.rebuild()
     if settings_watcher is not None:
         settings_watcher.mark_synced()   # this process is already up to date
 
@@ -157,10 +158,10 @@ register_swap_callback(swap_wlc_client)
 _is_primary = (not FLASK_DEBUG) or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
 _run_workers = RUN_WORKERS and _is_primary
 
-collector = ClientCollector(client, mongo_db, interval=COLLECT_INTERVAL)
+collector = ClientCollector(site_manager.entries, mongo_db, interval=COLLECT_INTERVAL)
 cleanup_scheduler = CleanupScheduler(mongo_db)
 register_cleanup(cleanup_scheduler)
-event_engine = EventEngine(client, mongo_db, interval=60)
+event_engine = EventEngine(site_manager.entries, mongo_db, interval=60)
 register_engine(event_engine)
 # Every instance (worker or web replica) watches for settings edits made
 # elsewhere so its own live client — used for on-demand WLC reads — stays current.
@@ -180,7 +181,7 @@ if _is_primary:
     settings_watcher.start(); atexit.register(settings_watcher.stop)
 
 # ── Blueprints ─────────────────────────────────────────
-init_api(lambda: client, mongo_db, effective_demo_mode)
+init_api(site_manager.for_site, site_manager.default_id, mongo_db, effective_demo_mode)
 init_map(mongo_db)
 init_tracking(mongo_db)
 
@@ -201,6 +202,7 @@ app.register_blueprint(tracking_bp)
 app.register_blueprint(map_bp)
 app.register_blueprint(events_bp)
 app.register_blueprint(license_bp)
+app.register_blueprint(sites_bp)
 
 # ── Serve built frontend (production / Docker) ─────────
 # Hash routing means the SPA only requests "/" + static assets — index + Flask's

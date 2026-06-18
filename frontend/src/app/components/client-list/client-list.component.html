@@ -7,7 +7,13 @@
         <span *ngIf="loading()">Loading…</span>
       </p>
     </div>
-    <button class="btn-refresh" (click)="load()" [disabled]="loading()" title="Refresh">↻</button>
+    <div class="header-actions">
+      <div class="view-toggle">
+        <button [class.on]="view() === 'list'" (click)="view.set('list')" title="List view">☰ List</button>
+        <button [class.on]="view() === 'charts'" (click)="view.set('charts')" title="Charts view">▦ Charts</button>
+      </div>
+      <button class="btn-refresh" (click)="load()" [disabled]="loading()" title="Refresh">↻</button>
+    </div>
   </div>
 
   <div class="error-banner" *ngIf="error()">{{ error() }}</div>
@@ -46,7 +52,38 @@
     <button class="btn-clear" (click)="clearFilters()" title="Clear all filters">Clear</button>
   </div>
 
-  <div class="table-card">
+  <!-- ── Charts view ───────────────────────────────── -->
+  <div class="charts-wrap" *ngIf="view() === 'charts'">
+    <app-spinner *ngIf="loading()" label="Loading clients…"></app-spinner>
+    <ng-container *ngIf="!loading()">
+      <div class="empty-charts" *ngIf="filtered().length === 0">No clients match the current filters.</div>
+      <div class="charts-grid" *ngIf="filtered().length > 0">
+        <div class="chart-card">
+          <div class="chart-title">Signal Quality</div>
+          <div class="chart-body"><app-chart type="doughnut" [data]="qualityData()"></app-chart></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Clients by Band</div>
+          <div class="chart-body"><app-chart type="doughnut" [data]="bandData()"></app-chart></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">SNR Distribution</div>
+          <div class="chart-body"><app-chart type="bar" [data]="snrData()"></app-chart></div>
+        </div>
+        <div class="chart-card wide">
+          <div class="chart-title">Top SSIDs by Clients</div>
+          <div class="chart-body"><app-chart type="bar" [data]="ssidData()" [options]="barOptions"></app-chart></div>
+        </div>
+        <div class="chart-card wide">
+          <div class="chart-title">Top APs by Clients</div>
+          <div class="chart-body"><app-chart type="bar" [data]="apData()" [options]="barOptions"></app-chart></div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+  <!-- ── List view ─────────────────────────────────── -->
+  <div class="table-card" *ngIf="view() === 'list'">
     <app-spinner *ngIf="loading()" label="Loading clients…"></app-spinner>
     <table *ngIf="!loading()">
       <thead>

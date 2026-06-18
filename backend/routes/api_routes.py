@@ -9,23 +9,36 @@ from services.auth import require_auth, require_role
 from services.settings import get_target_version, set_target_version, get_setup_complete
 from services.advisor import build_recommendations
 from services.licensing import get_license_info
+from services import sites as sites_svc
+from services.access import resolve_site, allowed_sites
+from models.wlc_client import WlcClient
+
+_EMPTY_CLIENT = WlcClient()   # safe-defaults fallback when no site is configured
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
-_get_client = None      # callable returning the current live client
+_client_for = None      # callable(site_id) -> live client
+_default_site = None    # callable() -> default site id
 _db = None
 _demo_mode = None       # callable -> bool
 
 
-def init_api(get_client, mongo_db, effective_demo_mode):
-    global _get_client, _db, _demo_mode
-    _get_client = get_client
+def init_api(client_for, default_site, mongo_db, effective_demo_mode):
+    global _client_for, _default_site, _db, _demo_mode
+    _client_for = client_for
+    _default_site = default_site
     _db = mongo_db
     _demo_mode = effective_demo_mode
 
 
+def _site_id():
+    """Resolve the target site from ?site= — enforcing per-site access — then
+    fall back to the default site."""
+    return resolve_site(request.args.get("site")) or _default_site()
+
+
 def _c():
-    return _get_client()
+    return _client_for(_site_id()) or _EMPTY_CLIENT
 
 
 # ── health / system ────────────────────────────────────
@@ -33,6 +46,40 @@ def _c():
 @api_bp.route("/health")
 def health():
     return jsonify(_c().health_check())
+
+
+# ── multisite NOC overview (cached, no live controller hit) ─
+@api_bp.route("/overview")
+@require_auth
+def overview():
+    statuses = {d["_id"]: d for d in _db["site_status"].find()}
+    allowed = allowed_sites()       # None = admin (all)
+    out = []
+    agg = {"sites": 0, "sites_online": 0, "total_aps": 0, "online_aps": 0, "clients": 0, "alerts": 0}
+    for s in sites_svc.list_sites():
+        if not s.get("enabled"):
+            continue
+        sid = s["id"]
+        if allowed is not None and sid not in allowed:
+            continue
+        st = statuses.get(sid, {})
+        alerts = _db["events"].count_documents({"site_id": sid, "active": True, "acked": False})
+        reachable = bool(st.get("reachable"))
+        out.append({
+            "id": sid, "name": s.get("name", sid), "location": s.get("location", ""),
+            "reachable": reachable, "total_aps": st.get("total_aps", 0), "online_aps": st.get("online_aps", 0),
+            "clients": st.get("clients", 0), "cpu": st.get("cpu", 0), "mem": st.get("mem", 0),
+            "alerts": alerts,
+            "updated_at": st["updated_at"].isoformat() if st.get("updated_at") else None,
+        })
+        agg["sites"] += 1
+        agg["sites_online"] += 1 if reachable else 0
+        agg["total_aps"] += st.get("total_aps", 0)
+        agg["online_aps"] += st.get("online_aps", 0)
+        agg["clients"] += st.get("clients", 0)
+        agg["alerts"] += alerts
+    out.sort(key=lambda x: (x["name"] or "").lower())
+    return jsonify({"totals": agg, "sites": out})
 
 
 @api_bp.route("/dashboard")
@@ -150,7 +197,8 @@ def advisor():
 def lifecycle():
     aps = _c().get_ap_lifecycle()
     target = get_target_version()
-    counts = {d["_id"]: d for d in _db["ap_lifecycle"].find({}, {"reboot_count": 1, "flap_count": 1})}
+    counts = {d.get("mac"): d for d in _db["ap_lifecycle"].find(
+        {"site_id": _site_id()}, {"mac": 1, "reboot_count": 1, "flap_count": 1})}
     rows, versions = [], {}
     for a in aps:
         c = counts.get(a["mac"], {})

@@ -5,6 +5,15 @@ import { WlcService } from '../../services/wlc.service';
 import { WirelessClient } from '../../models/models';
 import { PaginatorComponent } from '../paginator/paginator.component';
 import { SpinnerComponent } from '../spinner/spinner.component';
+import { ChartComponent } from '../chart/chart.component';
+
+const QUALITY = [
+  ['Excellent', '#34C759'], ['Good', '#5A9BD5'], ['Fair', '#E8A838'],
+  ['Poor', '#E07830'], ['Critical', '#C8102E'],
+];
+const BAND_COLOR: Record<string, string> = {
+  '2.4 GHz': '#E8A838', '5 GHz': '#5A9BD5', '6 GHz': '#9B72CF',
+};
 
 type SortKey = keyof Pick<WirelessClient,
   'hostname' | 'mac' | 'ip' | 'username' | 'ap_name' | 'ssid' | 'band'
@@ -14,7 +23,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-client-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, PaginatorComponent, SpinnerComponent],
+  imports: [CommonModule, FormsModule, PaginatorComponent, SpinnerComponent, ChartComponent],
   templateUrl: './client-list.component.html',
   styleUrl: './client-list.component.css',
 })
@@ -23,6 +32,9 @@ export class ClientListComponent implements OnInit {
   total = signal(0);
   loading = signal(true);
   error = signal<string | null>(null);
+
+  // List ⇄ Charts view toggle
+  view = signal<'list' | 'charts'>('list');
 
   // Filters
   search = signal('');
@@ -85,12 +97,67 @@ export class ClientListComponent implements OnInit {
     return list.slice((p - 1) * s, p * s);
   });
 
+  // ── Chart data (reacts to the same filters as the table) ──
+  readonly barOptions = { indexAxis: 'y', plugins: { legend: { display: false } } };
+
+  readonly qualityData = computed(() => {
+    const counts = QUALITY.map(([label]) =>
+      this.filtered().filter(c => c.quality_label === label).length);
+    return {
+      labels: QUALITY.map(q => q[0]),
+      datasets: [{ data: counts, backgroundColor: QUALITY.map(q => q[1]), borderWidth: 0 }],
+    };
+  });
+
+  readonly bandData = computed(() => {
+    const map = this.countBy(c => c.band || 'Unknown');
+    const labels = [...map.keys()];
+    return {
+      labels,
+      datasets: [{
+        data: labels.map(l => map.get(l)),
+        backgroundColor: labels.map(l => BAND_COLOR[l] || '#706868'), borderWidth: 0,
+      }],
+    };
+  });
+
+  readonly snrData = computed(() => {
+    const buckets = ['0–10', '10–15', '15–20', '20–25', '25–30', '30+'];
+    const counts = [0, 0, 0, 0, 0, 0];
+    for (const c of this.filtered()) {
+      const s = c.snr_db || 0;
+      const i = s >= 30 ? 5 : s >= 25 ? 4 : s >= 20 ? 3 : s >= 15 ? 2 : s >= 10 ? 1 : 0;
+      counts[i]++;
+    }
+    return { labels: buckets, datasets: [{ label: 'Clients', data: counts, backgroundColor: '#5A9BD5', borderRadius: 4 }] };
+  });
+
+  readonly ssidData = computed(() => this.topBar(c => c.ssid, 8, '#3E6BB0'));
+  readonly apData = computed(() => this.topBar(c => c.ap_name, 10, '#9B72CF'));
+
   constructor(private wlc: WlcService) {
     effect(() => {
       this.search(); this.filterBand(); this.filterProtocol();
       this.filterSsid(); this.filterQuality();
       this.page.set(1);
     });
+  }
+
+  private countBy(pick: (c: WirelessClient) => string): Map<string, number> {
+    const m = new Map<string, number>();
+    for (const c of this.filtered()) {
+      const k = (pick(c) || '').trim();
+      if (k) m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  }
+
+  private topBar(pick: (c: WirelessClient) => string, n: number, color: string) {
+    const sorted = [...this.countBy(pick).entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+    return {
+      labels: sorted.map(e => e[0]),
+      datasets: [{ label: 'Clients', data: sorted.map(e => e[1]), backgroundColor: color, borderRadius: 4 }],
+    };
   }
 
   ngOnInit() { this.load(); }

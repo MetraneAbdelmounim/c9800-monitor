@@ -7,10 +7,38 @@
         <span *ngIf="loading()">Loading…</span>
       </p>
     </div>
-    <button class="btn-refresh" (click)="load()" [disabled]="loading()" title="Refresh">↻</button>
+    <div class="wm-header-actions">
+      <div class="wm-view-toggle">
+        <button [class.on]="view() === 'list'" (click)="view.set('list')" title="List view">☰ List</button>
+        <button [class.on]="view() === 'charts'" (click)="view.set('charts')" title="Charts view">▦ Charts</button>
+      </div>
+      <button class="btn-refresh" (click)="load()" [disabled]="loading()" title="Refresh">↻</button>
+    </div>
   </div>
 
   <div class="error-banner" *ngIf="error()">{{ error() }}</div>
+
+  <!-- ── Charts view ───────────────────────────────── -->
+  <div class="wm-charts-wrap" *ngIf="view() === 'charts'">
+    <app-spinner *ngIf="loading()" label="Loading WLANs…"></app-spinner>
+    <ng-container *ngIf="!loading()">
+      <div class="wm-empty-charts" *ngIf="filtered().length === 0">No WLANs match the current filters.</div>
+      <div class="wm-charts-grid" *ngIf="filtered().length > 0">
+        <div class="wm-chart-card">
+          <div class="wm-chart-title">Status</div>
+          <div class="wm-chart-body"><app-chart type="doughnut" [data]="statusData()"></app-chart></div>
+        </div>
+        <div class="wm-chart-card">
+          <div class="wm-chart-title">Security</div>
+          <div class="wm-chart-body"><app-chart type="doughnut" [data]="securityData()"></app-chart></div>
+        </div>
+        <div class="wm-chart-card">
+          <div class="wm-chart-title">Band</div>
+          <div class="wm-chart-body"><app-chart type="doughnut" [data]="bandData()"></app-chart></div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
 
   <div class="toolbar">
     <div class="search-box">
@@ -41,7 +69,7 @@
     <button class="btn-clear" (click)="clearFilters()" title="Clear all filters">Clear</button>
   </div>
 
-  <div class="table-card">
+  <div class="table-card" *ngIf="view() === 'list'">
     <app-spinner *ngIf="loading()" label="Loading WLANs…"></app-spinner>
     <table *ngIf="!loading()">
       <thead>
