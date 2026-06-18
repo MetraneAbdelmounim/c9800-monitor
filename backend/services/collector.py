@@ -24,6 +24,7 @@ class ClientCollector:
         self._running = False
         self._thread = None
         self._last_ap = {}      # key "site_id|mac" -> ap_name
+        self._ap_cache = {}     # site_id -> (total_aps, online_aps), refreshed every 5th cycle
 
     def _setup_db(self):
         try:
@@ -148,19 +149,25 @@ class ClientCollector:
         if cycle % 5 == 0 and snapshots:
             self._downsample(sid, now, clients)
 
-        self._collect_status(entry, now, clients, reachable)
+        self._collect_status(entry, now, clients, reachable, cycle)
 
-    def _collect_status(self, entry, now, clients, reachable):
+    def _collect_status(self, entry, now, clients, reachable, cycle):
         """Per-site summary for the overview + system_metrics time-series."""
         sid, rc = entry["id"], entry["client"]
-        total_aps = online_aps = 0
         cpu_pct = mem_pct = 0
-        try:
-            aps = rc.get_ap_summary(page=1, per_page=100000).get("aps", [])
-            total_aps = len(aps)
-            online_aps = sum(1 for a in aps if _is_up(a.get("state", "")))
-        except Exception:
-            reachable = False
+        # The full AP inventory is heavy on the C9800 (serialized RESTCONF) and
+        # competes with user page requests — refresh it only every 5th cycle and
+        # reuse the last counts in between, instead of every cycle.
+        cached = self._ap_cache.get(sid)
+        if cached is None or cycle % 5 == 0:
+            try:
+                aps = rc.get_ap_summary(page=1, per_page=100000).get("aps", [])
+                cached = (len(aps), sum(1 for a in aps if _is_up(a.get("state", ""))))
+                self._ap_cache[sid] = cached
+            except Exception:
+                reachable = False
+                cached = cached or (0, 0)
+        total_aps, online_aps = cached
         try:
             cpu_pct = rc.get_cpu_usage().get("one_minute", 0) or 0
             mem = rc.get_memory_usage()
