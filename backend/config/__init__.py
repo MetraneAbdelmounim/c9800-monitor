@@ -73,8 +73,10 @@ MONGO_AUTH_SOURCE = os.getenv("MONGO_AUTH_SOURCE", "admin")
 COLLECT_INTERVAL = _int("COLLECT_INTERVAL", 30)
 
 # Seconds to cache live controller reads on the API path (per site, per call).
-# Smooths slow C9800 RESTCONF + the dashboard's parallel/polling calls. 0 disables.
-API_CACHE_TTL = _int("API_CACHE_TTL", 20)
+# Small enough to stay effectively live, big enough to dedupe the dashboard's
+# burst of parallel calls. Raise for very slow controllers; 0 disables (fully
+# live, but every click waits on the controller).
+API_CACHE_TTL = _int("API_CACHE_TTL", 5)
 
 # ── JWT Auth ───────────────────────────────────────────
 JWT_SECRET = os.getenv("JWT_SECRET", _WEAK_JWT)
